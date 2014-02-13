@@ -95,16 +95,6 @@ function stanford_cap_api_settings_form($form_state) {
     '#required' => TRUE,
   );
 
-//  $form['actions'] = array('#type' => 'actions');
-//  $form['actions']['submit'] = array(
-//    '#type' => 'submit',
-//    '#value' => t('Save settings'),
-//  );
-//
-//  if (!variable_get('stanford_cap_api_configured', FALSE)) {
-//    $form['actions']['submit']['#value'] = t('Next');
-//  }
-
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save settings'),
