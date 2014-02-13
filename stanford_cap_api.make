@@ -2,7 +2,7 @@ core = 6.x
 api = 2
 
 ; Drupal 6.x core:
-projects[drupal][version] = 6
+projects[] = drupal
 
 ; Modules
 ; --------
@@ -27,31 +27,31 @@ projects[flexifield][subdir] = "contrib"
 projects[flexifield][download][type] = git
 projects[flexifield][download][branch] = 6.x-1.x
 projects[flexifield][download][revision] = 957b7001275d1eda197ae27db27e7fa9aec286b9
-projects[flexifield][patch][] = "https://drupal.org/files/issues/flexifield-2195233-1.patch"
+projects[flexifield][patch][] = "https://drupal.org/files/issues/flexifield-2195233-2.patch"
 ; AHAH Page Storage
 projects[ahah_page_storage][type] = "module"
 projects[ahah_page_storage][subdir] = "contrib"
-projects[ahah_page_storage][version] = 6.x-1.1
+projects[ahah_page_storage][version] = 1.1
 ; AHAH Response
 projects[ahah_response][type] = "module"
 projects[ahah_response][subdir] = "contrib"
-projects[ahah_response][version] = 6.x-1.2
+projects[ahah_response][version] = 1.2
 ; AHAH Script Ensurer
 projects[ahah_script_ensurer][type] = "module"
 projects[ahah_script_ensurer][subdir] = "contrib"
-projects[ahah_script_ensurer][version] = 6.x-1.0
+projects[ahah_script_ensurer][version] = 1.0
 ; AHAH Style Ensurer
 projects[ahah_style_ensurer][type] = "module"
 projects[ahah_style_ensurer][subdir] = "contrib"
-projects[ahah_style_ensurer][version] = 6.x-1.0
+projects[ahah_style_ensurer][version] = 1.0
 ; jQuery AOP
 projects[jquery_aop][type] = "module"
 projects[jquery_aop][subdir] = "contrib"
-projects[jquery_aop][version] = 6.x-1.0
+projects[jquery_aop][version] = 1.0
 ; Stanford CAP API
 projects[stanford_cap_api][type] = "module"
-projects[stanford_cap_api][subdir] = "contrib"
+projects[stanford_cap_api][subdir] = "custom"
 projects[stanford_cap_api][download][type] = git
 projects[stanford_cap_api][download][url] = "http://kroskoliy@git.trellon.org/stanford-cap-d6"
 projects[stanford_cap_api][download][branch] = 6.x-1.x
-projects[stanford_cap_api][download][revision] = 957b7001275d1eda197ae27db27e7fa9aec286b9
+projects[stanford_cap_api][do_recursion] = 0
