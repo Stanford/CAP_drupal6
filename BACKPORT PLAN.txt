@@ -1,9 +1,0 @@
-Replace "admin/config/cap" with "admin/settings/cap" in hook_menu() related code.
-Modify form builders:
- - it accepts only copy of $form_state
- - remove wrapper of type 'actions' from submit buttons
- - replace '#attached' in form builders with drupal_add_js/css
- - replace wrapper of type 'container' with fieldsets
- - replace '#markup' in form elements with '#value'
-Modify theme implementation:
- - if template: replace 'variables' with 'arguments', in theme() call replace array of vars with array keys variables

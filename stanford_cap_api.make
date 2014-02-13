@@ -48,6 +48,29 @@ projects[ahah_style_ensurer][version] = 1.0
 projects[jquery_aop][type] = "module"
 projects[jquery_aop][subdir] = "contrib"
 projects[jquery_aop][version] = 1.0
+; Features
+projects[features][type] = "module"
+projects[features][subdir] = "contrib"
+projects[features][download][type] = git
+projects[features][download][branch] = 6.x-1.x
+projects[features][download][revision] = 0e7bc91fd23cec19d00e04b9a75f1c89ffe8b59a
+; Strongarm
+projects[strongarm][type] = "module"
+projects[strongarm][subdir] = "contrib"
+projects[strongarm][version] = 6.x-2.2
+; Date
+projects[date][type] = "module"
+projects[date][subdir] = "contrib"
+projects[date][download][type] = git
+projects[date][download][branch] = 6.x-2.x
+projects[date][download][revision] = 1389456c76074a1da105a19683e88b0b9012fe7f
+; Link
+projects[link][type] = "module"
+projects[link][subdir] = "contrib"
+projects[link][download][type] = git
+projects[link][download][branch] = 6.x-2.x
+projects[link][download][revision] = 50bd3d7a4201e7f6da6a646214367a225caa5fd4
+
 ; Stanford CAP API
 projects[stanford_cap_api][type] = "module"
 projects[stanford_cap_api][subdir] = "custom"
