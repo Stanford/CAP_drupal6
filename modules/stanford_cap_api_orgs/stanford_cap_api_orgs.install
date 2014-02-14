@@ -13,12 +13,12 @@
 function stanford_cap_api_orgs_install() {
   $t = get_t();
   $vocabulary = array(
-    'nodes' => array('stanford_organization'),
+    'nodes' => array('stanford_organization' => 'stanford_organization'),
     'name' => $t('Stanford University Org Code Hierarchy'),
     'module' => 'stanford_org_code_hierarchy',
     'description' => '',
     'help' => '',
-    'hierarchy' => 2,
+    'multiple' => 1,
   );
   taxonomy_save_vocabulary($vocabulary);
   variable_set('stanford_cap_api_orgs_vid', $vocabulary['vid']);
