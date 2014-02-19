@@ -117,6 +117,7 @@ function stanford_cap_api_settings_form($form_state) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save settings'),
+    '#weight' => 1000,
   );
   // If module not configured yet, button should read 'Next'.
   if (!variable_get('stanford_cap_api_configured', FALSE)) {
