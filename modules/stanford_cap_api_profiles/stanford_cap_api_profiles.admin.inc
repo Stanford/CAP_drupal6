@@ -61,11 +61,11 @@ function stanford_cap_api_profiles_form_stanford_cap_api_settings_form_alter(&$f
     if (isset($form_state['values']) && isset($form_state['values']['stanford_cap_api_import_profile_fields']) && $form_state['values']['stanford_cap_api_import_profile_fields'] == CAP_FIELDS_IMPORT_LIST) {
       // Import of fields list was selected. Building fields list select form.
       $form['auth']['#access'] = FALSE;
-      $form['description_wrapper']['description']['#markup'] = t('Please select the fields for CAP Profiles that will be synchronized with the CAP API.');
-      $form['actions']['submit']['#value'] = t('Next');
-      $form['actions']['submit']['#weight'] = 1;
+      $form['description_wrapper']['description']['#value'] = t('Please select the fields for CAP Profiles that will be synchronized with the CAP API.');
+      $form['submit']['#value'] = t('Next');
+      $form['submit']['#weight'] = 1;
 
-      $form['actions']['back'] = array(
+      $form['back'] = array(
         '#type' => 'submit',
         '#value' => t('Back'),
         '#executes_submit_callback' => FALSE,
@@ -863,7 +863,7 @@ function _stanford_cap_api_profiles_get_term_tid($str) {
  * Creates FAPI checkboxes for fields.
  */
 function _stanford_cap_api_profiles_field_checkboxes($fields, &$parent_elem, $parent_field = '') {
-  $weight =& drupal_static(__FUNCTION__, -100);
+  static $weight = -100;
 
   foreach ($fields as $f_name => $f_schema) {
     // Skip field collection with empty properties.
@@ -874,12 +874,12 @@ function _stanford_cap_api_profiles_field_checkboxes($fields, &$parent_elem, $pa
     $field_level = count(explode('.', $field_path));
     $parent_elem[$field_path] = array(
       '#type' => 'checkbox',
-      '#title' => check_plain($f_schema['title']),
+      '#title' => empty($f_schema['title']) ? $field_path : check_plain($f_schema['title']),
       '#description' => empty($f_schema['description']) ? '' : check_plain($f_schema['description']),
       '#return_value' => $field_path,
       '#attributes' => array(
         'parent' => $parent_field,
-        'class' => array('level-' . $field_level),
+        'class' => 'level-' . $field_level,
       ),
     );
 

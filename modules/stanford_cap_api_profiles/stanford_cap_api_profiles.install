@@ -142,7 +142,7 @@ function stanford_cap_api_profiles_schema() {
  */
 function stanford_cap_api_profiles_enable() {
   $file_name = '/stanford_cap_api_profiles_text_fields_list';
-  $file = new SplFileObject(DRUPAL_ROOT . '/' . drupal_get_path('module', 'stanford_cap_api_profiles') . $file_name, 'r');
+  $file = new SplFileObject(dirname($GLOBALS['_SERVER']['SCRIPT_FILENAME']) . '/' . drupal_get_path('module', 'stanford_cap_api_profiles') . $file_name, 'r');
   $fields_list = array();
   foreach ($file as $field) {
     $fields_list[] = trim($field);

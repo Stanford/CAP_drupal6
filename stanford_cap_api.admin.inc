@@ -55,14 +55,14 @@ function stanford_cap_api_settings_form($form_state) {
 
   $form['auth']['stanford_cap_api_username'] = array(
     '#type' => 'textfield',
-    '#title' => t('Client ID:'),
+    '#title' => t('Client ID'),
     '#default_value' => variable_get('stanford_cap_api_username', ''),
     '#required' => TRUE,
   );
 
   $form['auth']['stanford_cap_api_password'] = array(
     '#type' => 'password',
-    '#title' => t('Authz secret:'),
+    '#title' => t('Authz secret'),
   );
 
   $form['auth']['advanced'] = array(

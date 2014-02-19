@@ -735,7 +735,7 @@ function stanford_cap_api_profiles_get_profile_schema() {
 function stanford_cap_api_profiles_theme() {
   return array(
     'stanford_cap_api_profiles_field_tree' => array(
-      'render element' => 'schema_tree',
+      'arguments' => array('schema_tree' => array()),
       'file' => 'stanford_cap_api_profiles.theme.inc',
     ),
   );

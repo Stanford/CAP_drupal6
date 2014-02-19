@@ -1,0 +1,25 @@
+#fields li {
+  list-style: none;
+  background: none;
+  padding: 0;
+}
+
+#fields li .form-item {
+  margin-top: 0;
+}
+
+#fields .level-2 {
+  margin-left: 25px;
+}
+
+#fields .level-3 {
+  margin-left: 50px;
+}
+
+#fields .level-4 {
+  margin-left: 75px;
+}
+
+#fields .level-5 {
+  margin-left: 100px;
+}
