@@ -1,0 +1,21 @@
+<?php
+/**
+ * @file
+ * Code for the Stanford CAP API module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function stanford_cap_api_uninstall() {
+  // Drop module variables.
+  variable_del('stanford_cap_api_cron_start');
+  variable_del('stanford_cap_api_cron_stop');
+  variable_del('stanford_cap_api_token_expire');
+  variable_del('stanford_cap_api_token');
+  variable_del('stanford_cap_api_username');
+  variable_del('stanford_cap_api_password');
+  variable_del('stanford_cap_api_base_url');
+  variable_del('stanford_cap_api_auth_uri');
+  variable_del('stanford_cap_api_configured');
+}

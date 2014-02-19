@@ -50,13 +50,7 @@ function stanford_cap_api_settings_form($form_state) {
   $form['auth'] = array(
     '#type' => 'fieldset',
     '#title' => t('Authorization'),
-  );
-
-  $form['auth']['description_wrapper'] = array(
-    '#type' => 'container',
-  );
-  $form['auth']['description_wrapper']['description'] = array(
-    '#value' => t('Please enter your authentication information for the CAP API.'),
+    '#description' => t('Please enter your authentication information for the CAP API.'),
   );
 
   $form['auth']['stanford_cap_api_username'] = array(
@@ -94,6 +88,31 @@ function stanford_cap_api_settings_form($form_state) {
     '#default_value' => variable_get('stanford_cap_api_auth_uri', 'https://authz.stanford.edu/oauth/token'),
     '#required' => TRUE,
   );
+  $form['auth']['advanced']['cron'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Cron settings'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+    '#description' => t('Here you can configure hours in which maintenance tasks will be executed.'),
+  );
+
+  $options = range(0, 23, 1);
+
+  $form['auth']['advanced']['cron']['start_hour'] = array(
+    '#type' => 'select',
+    '#title' => t('Start hour'),
+    '#description' => t('Execution will start after this hour.'),
+    '#options' => $options,
+    '#default_value' => variable_get('stanford_cap_api_cron_start', 1),
+  );
+
+  $form['auth']['advanced']['cron']['stop_hour'] = array(
+    '#type' => 'select',
+    '#title' => t('Stop hour'),
+    '#description' => t('Execution will start before this hour.'),
+    '#options' => $options,
+    '#default_value' => variable_get('stanford_cap_api_cron_stop', 5),
+  );
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -111,6 +130,7 @@ function stanford_cap_api_settings_form($form_state) {
  * Validation handler for settings form.
  */
 function stanford_cap_api_settings_form_validate($form, &$form_state) {
+  // Validates authentication.
   if (!empty($form_state['values']['stanford_cap_api_username']) && !empty($form_state['values']['stanford_cap_api_password'])) {
     $username = $form_state['values']['stanford_cap_api_username'];
     $password = $form_state['values']['stanford_cap_api_password'];
@@ -141,6 +161,8 @@ function stanford_cap_api_settings_form_submit($form, &$form_state) {
   }
   drupal_set_message(t('Configuration saved.'));
   variable_set('stanford_cap_api_configured', TRUE);
+  variable_set('stanford_cap_api_cron_start', $values['start_hour']);
+  variable_set('stanford_cap_api_cron_stop', $values['stop_hour']);
 }
 
 /**

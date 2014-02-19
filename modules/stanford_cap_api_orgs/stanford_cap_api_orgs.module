@@ -134,16 +134,7 @@ function stanford_cap_api_orgs_import($batch = FALSE) {
  * Implements hook_cron().
  */
 function stanford_cap_api_orgs_cron() {
-  // @todo: Move hours selection to settings in cap_api, create reusable cron function to run tasks in CAP modules.
-  // Run cron tasks between 1 and 5 hours.
-//  $tz = variable_get('date_default_timezone', 'UTC');
-//  $date = date_create();
-//
-//  $date = new DateObject('now', $tz);
-//  $hour_of_day = (int) $date->format('G');
-//  if ($hour_of_day >= 1 && $hour_of_day <= 5) {
-//    stanford_cap_api_orgs_import();
-//  }
+  stanford_cap_api_run_cron(array(array('stanford_cap_api_orgs_import')));
 }
 
 /**

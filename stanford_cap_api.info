@@ -2,3 +2,5 @@ name = Stanford CAP API
 description = Provide ability to access Stanford CAP API.
 core = 6.x
 package = Stanford
+dependencies[] = date_api
+dependencies[] = date_timezone

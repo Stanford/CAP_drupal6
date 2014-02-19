@@ -332,3 +332,39 @@ function stanford_cap_api_batch_alter(&$batch) {
     $batch['redirect'] = 'admin/settings/cap/config/details';
   }
 }
+
+/**
+ * Run tasks in configured hours.
+ *
+ * @param array $tasks
+ *   Array of tasks to run in format:
+ * @code
+ * array(
+ *   array('my_function_1', array($arg1)),
+ *   array('my_function_2', array($arg2_1, $arg2_2)),
+ *   array('my_function_3'),
+ * )
+ * @endcode
+ */
+function stanford_cap_api_run_cron($tasks = array()) {
+  $tz = variable_get('date_default_timezone_name', 'UTC');
+  $date = date_create(NULL, timezone_open($tz));
+  $hour_of_day = date_format($date, 'G');
+  $start_hour = variable_get('stanford_cap_api_cron_start', 1);
+  $stop_hour = variable_get('stanford_cap_api_cron_stop', 5);
+
+  if ($hour_of_day >= $start_hour && $hour_of_day <= $stop_hour) {
+    // Run passed tasks.
+    foreach ($tasks as $task) {
+      if (function_exists($task[0])) {
+        if (isset($task[1])) {
+          call_user_func_array($task[0], $task[1]);
+        }
+        else {
+          call_user_func($task[0]);
+        }
+      }
+    }
+
+  }
+}
