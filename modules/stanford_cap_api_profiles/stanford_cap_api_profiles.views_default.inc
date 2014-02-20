@@ -212,7 +212,7 @@ function stanford_cap_api_profiles_views_default_views() {
   $handler->display->display_options['empty']['area']['field'] = 'area';
   $handler->display->display_options['empty']['area']['label'] = '';
   $handler->display->display_options['empty']['area']['empty'] = FALSE;
-  $handler->display->display_options['empty']['area']['content'] = 'No CAP profiles are being stored in the site. You can <a href="/admin/config/cap/config/import">add profiles</a> or <a href="/admin/config/cap/config/group">add groups</a>.';
+  $handler->display->display_options['empty']['area']['content'] = 'No CAP profiles are being stored in the site. You can <a href="/admin/settings/cap/config/import">add profiles</a> or <a href="/admin/settings/cap/config/group">add groups</a>.';
   $handler->display->display_options['empty']['area']['format'] = '2';
   $handler->display->display_options['empty']['area']['tokenize'] = 0;
   /* Field: Node: Nid */

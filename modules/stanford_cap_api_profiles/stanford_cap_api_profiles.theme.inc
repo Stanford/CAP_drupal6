@@ -26,3 +26,27 @@ function _stanford_cap_api_profiles_field_tree(&$elem, &$items = array()) {
     unset($elem[$key]);
   }
 }
+
+/**
+ * Emulates Drupal 7 #tableselect FAPI type for result table.
+ */
+function theme_stanford_cap_api_profiles_result_tableselect($form) {
+  $header = array(
+    theme('table_select_header_cell'),
+    t('Name'),
+    t('Profile link'),
+  );
+  $output = '';
+  $rows = array();
+  foreach (element_children($form['name']) as $key) {
+    $row = array();
+    $row[] = drupal_render($form['profiles'][$key]);
+    $row[] = drupal_render($form['name'][$key]);
+    $row[] = drupal_render($form['link'][$key]);
+    $rows[] = $row;
+  }
+  $output .= theme('table', $header, $rows);
+  $output .= drupal_render($form);
+
+  return $output;
+}

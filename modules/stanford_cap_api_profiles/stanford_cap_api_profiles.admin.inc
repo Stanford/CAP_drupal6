@@ -146,7 +146,7 @@ function stanford_cap_api_profiles_form_stanford_cap_api_settings_form_alter(&$f
 
     $form['refresh']['stanford_cap_api_profile_update'] = array(
       '#type' => 'radios',
-      '#title' => t('CAP Profiles can be updated regularly to ensure you have the latest content available for the site:'),
+      '#title' => t('CAP Profiles can be updated regularly to ensure you have the latest content available for the site'),
       '#default_value' => variable_get('stanford_cap_api_profile_update', 'nightly'),
       '#options' => array(
         'viewing' => t('When viewing the profile.'),
@@ -166,7 +166,7 @@ function stanford_cap_api_profiles_form_stanford_cap_api_settings_form_alter(&$f
     );
     $form['orphaned']['stanford_cap_api_profile_orphaned_action'] = array(
       '#type' => 'radios',
-      '#title' => t('When a profile is removed from the CAP API:'),
+      '#title' => t('When a profile is removed from the CAP API'),
       '#default_value' => variable_get('cap_stanford_cap_api_profile_orphaned_action', 'unpublish'),
       '#options' => $options,
     );
@@ -212,8 +212,8 @@ function stanford_cap_api_profiles_settings_form_submit($form, &$form_state) {
 /**
  * Form builder for import page.
  */
-function stanford_cap_api_profiles_import_form($form, &$form_state) {
-
+function stanford_cap_api_profiles_import_form($form_state) {
+  $form = array();
   $form['description'] = array(
     '#type' => 'item',
     '#value' => t('Individual CAP Profiles can be imported into the system by identifying the correct faculty members to add to your website. Use the tools below to search for  individual profiles, and you can select specific profiles for import   on the next screen.'),
@@ -260,10 +260,10 @@ function stanford_cap_api_profiles_import_form($form, &$form_state) {
     '#description' => t('Please enter SUNET ids for the profiles you wish to import. You can enter multiple SUNET IDs by separating them with a comma.'),
   );
 
-  $form['actions'] = array('#type' => 'actions');
-  $form['actions']['submit'] = array(
+  $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Search'),
+    '#weight' => 1000,
   );
 
   return $form;
@@ -281,8 +281,13 @@ function stanford_cap_api_profiles_import_form_submit($form, &$form_state) {
     $params['name'] = check_plain($values['name']);
   }
   if (!empty($values['organization'])) {
-    $term_wrapper = entity_metadata_wrapper('taxonomy_term', _stanford_cap_api_profiles_get_term_tid($values['organization']));
-    $org_codes = $term_wrapper->field_org_codes->value();
+    $nid = _stanford_cap_api_profiles_get_term_tid($values['organization']);
+    $node = node_load($nid);
+    $terms = taxonomy_node_get_terms($node);
+    $org_codes = array();
+    foreach ($terms as $term) {
+      $org_codes[] = $term->name;
+    }
     $params['orgCodes'] = implode(',', $org_codes);
   }
   if (!empty($values['workgroup'])) {
@@ -329,19 +334,16 @@ function _stanford_cap_api_profiles_prepare_list_str($str) {
 /**
  * Form builder for import result page.
  */
-function stanford_cap_api_profiles_import_result_form($form, &$form_state) {
-
+function stanford_cap_api_profiles_import_result_form($form_state) {
+  $form = array();
   if (!empty($_SESSION['search_response']) && !empty($_SESSION['search_response']['values'])) {
-    $form['description_wrapper'] = array(
-      '#type' => 'container',
-    );
     $link = l(t('Start new search.'), 'admin/settings/cap/config/import');
-    $form['description_wrapper']['description'] = array(
+    $form['description'] = array(
       '#value' => t('Please select the CAP profiles you would like to import into your site. !link', array('!link' => $link)),
     );
 
     $form['results_wrapper'] = array(
-      '#type' => 'container',
+      '#type' => 'fieldset',
     );
 
     if (isset($_GET['page']) && is_numeric($_GET['page'])) {
@@ -379,64 +381,37 @@ function stanford_cap_api_profiles_import_result_form($form, &$form_state) {
       )),
     );
 
-    $header = array(
-      'name' => t('Name'),
-      'link' => t('Profile link'),
-    );
-    $options = array();
+    $profiles = array();
     foreach ($search_response['values'] as $profile) {
+      $pid = $profile['profileId'];
       $href = _stanford_cap_api_profiles_get_cap_profile_url($profile);
-
-      $options[$profile['profileId']] = array(
-        'name' => array(
-          'data' => array(
-            '#type' => 'link',
-            '#title' => check_plain($profile['displayName']),
-            '#href' => $href,
-          ),
-        ),
-        'link' => array(
-          'data' => array(
-            '#type' => 'link',
-            '#title' => t('View in CAP'),
-            '#href' => $href,
-          ),
-        ),
-      );
+      $profiles[$pid] = '';
+      $form['tableselect']['name'][$pid] = array('#value' => check_plain($profile['displayName']));
+      $form['tableselect']['link'][$pid] = array('#value' => l(t('View in CAP'), $href, array('external' => TRUE)));
     }
-    $form['profiles'] = array(
-      '#type' => 'tableselect',
-      '#header' => $header,
-      '#options' => $options,
+    $form['tableselect']['profiles'] = array(
+      '#type' => 'checkboxes',
+      '#options' => $profiles,
     );
+    $form['tableselect']['#theme'] = 'stanford_cap_api_profiles_result_tableselect';
     $element = 0;
-    $parameters = array();
-    $quantity = 9;
     global $pager_page_array, $pager_total;
     $pager_page_array = array($element => $page_num - 1);
     $pager_total = array($element => $search_response['totalPages']);
 
     $form['pager'] = array(
-      '#value' => theme_pager(array(
-        'tags' => array(),
-        'element' => $element,
-        'parameters' => $parameters,
-        'quantity' => $quantity,
-      )),
+      '#value' => theme('pager', array(), CAP_PROFILES_ENTRY_PER_PAGE),
     );
 
-    $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array(
+    $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Import profiles'),
+      '#weight' => 1000,
     );
   }
   else {
-    $form['description_wrapper'] = array(
-      '#type' => 'container',
-    );
     $link = l(t('Want to try again?'), 'admin/settings/cap/config/import');
-    $form['description_wrapper']['description'] = array(
+    $form['description'] = array(
       '#value' => t("Search has returned no results. !link", array('!link' => $link)),
     );
   }
@@ -456,15 +431,13 @@ function stanford_cap_api_profiles_import_result_form_submit($form, &$form_state
     if (!variable_get('stanford_cap_api_profiles_schema_synchronized', FALSE)) {
       stanford_cap_api_profiles_synchronize_schema(TRUE);
     }
-    $profiles = $form_state['values']['profiles'];
+    $profiles = array_filter($form_state['values']['profiles']);
     $operations = array();
     foreach ($profiles as $profile) {
-      if ($profile != 0) {
-        $operations[] = array(
-          'stanford_cap_api_profiles_profile_import',
-          array($profile),
-        );
-      }
+      $operations[] = array(
+        'stanford_cap_api_profiles_profile_import',
+        array($profile),
+      );
     }
 
     $batch = array(
@@ -801,7 +774,7 @@ function stanford_cap_api_profiles_user_autocomplete($str = '') {
     }
   }
 
-  drupal_json_output($matches);
+  drupal_json($matches);
 }
 
 /**
@@ -813,31 +786,17 @@ function stanford_cap_api_profiles_user_autocomplete($str = '') {
  * @see taxonomy_autocomplete()
  */
 function stanford_cap_api_profiles_taxonomy_autocomplete($tag_typed = '') {
-  $voc = taxonomy_vocabulary_machine_name_load(CAP_ORGS_VOCAB);
-  $query = db_select('taxonomy_term_data', 't');
-  $query->addTag('translatable');
-  $query->addTag('term_access');
-
-  // Do not select already entered terms.
-  if (!empty($tags_typed)) {
-    $query->condition('t.name', $tags_typed, 'NOT IN');
-  }
-  // Select rows that match by term name.
-  $tags_return = $query
-    ->fields('t', array('tid', 'name'))
-    ->condition('t.vid', $voc->vid)
-    ->condition('t.name', '%' . db_like($tag_typed) . '%', 'LIKE')
-    ->range(0, 10)
-    ->execute()
-    ->fetchAllKeyed();
-
-  $term_matches = array();
-
-  foreach ($tags_return as $tid => $name) {
-    $term_matches[$name . ' (' . $tid . ')'] = check_plain($name);
+  $matches = array();
+  $result = db_query("SELECT nid, title FROM {node} WHERE type = 'stanford_organization' AND title LIKE '%%%s%%'", $tag_typed);
+  if ($result) {
+    while ($node = db_fetch_array($result)) {
+      if (!empty($node['nid']) && !empty($node['title'])) {
+        $matches[$node['title'] . ' (' . $node['nid'] . ')'] = check_plain($node['title']);
+      }
+    }
   }
 
-  drupal_json_output($term_matches);
+  drupal_json($matches);
 }
 
 /**

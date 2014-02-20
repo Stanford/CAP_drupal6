@@ -738,6 +738,10 @@ function stanford_cap_api_profiles_theme() {
       'arguments' => array('schema_tree' => array()),
       'file' => 'stanford_cap_api_profiles.theme.inc',
     ),
+    'stanford_cap_api_profiles_result_tableselect' => array(
+      'arguments' => array('form' => array()),
+      'file' => 'stanford_cap_api_profiles.theme.inc',
+    ),
   );
 }
 
@@ -2090,4 +2094,22 @@ function _stanford_cap_api_profiles_get_orgcode_fields($f_name, $f_schema, &$org
   foreach ($subfields as $subfield => $schema) {
     _stanford_cap_api_profiles_get_orgcode_fields($subfield, $schema, $orgcode_fields, $field_path);
   }
+}
+
+/**
+ * Implements hook_views_default_views_alter().
+ *
+ * Disables 'Manage profiles' view if profiles schema not synchronized yet.
+ */
+function stanford_cap_api_profiles_views_default_views_alter(&$views) {
+  if (!variable_get('stanford_cap_api_profiles_schema_synchronized', FALSE) && isset($views['cap_api_manage_profiles'])) {
+    $views['cap_api_manage_profiles']->disabled = TRUE;
+  }
+}
+
+function test() {
+  $nid = 3;
+  $node = node_load($nid);
+  $terms = taxonomy_node_get_terms($node);
+  dpm($terms);
 }
