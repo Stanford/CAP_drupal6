@@ -50,3 +50,27 @@ function theme_stanford_cap_api_profiles_result_tableselect($form) {
 
   return $output;
 }
+
+/**
+ * Emulates Drupal 7 #tableselect FAPI type for group sync table.
+ */
+function theme_stanford_cap_api_profiles_sync_groups_tableselect($form) {
+  $header = array(
+    theme('table_select_header_cell'),
+    t('Group'),
+    t('Profiles in group'),
+  );
+  $output = '';
+  $rows = array();
+  foreach (element_children($form['name']) as $key) {
+    $row = array();
+    $row[] = drupal_render($form['groups'][$key]);
+    $row[] = drupal_render($form['name'][$key]);
+    $row[] = drupal_render($form['count'][$key]);
+    $rows[] = $row;
+  }
+  $output .= theme('table', $header, $rows);
+  $output .= drupal_render($form);
+
+  return $output;
+}

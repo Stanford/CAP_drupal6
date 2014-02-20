@@ -547,23 +547,25 @@ function stanford_cap_api_profiles_sync_workgroup_members($workgroup_id, &$opera
  *   Type of group.
  * @param string $name
  *   Machine readable group name.
+ */
+function stanford_cap_api_profiles_sync_group_save($type, $name) {
+  db_query("INSERT INTO {cap_api_sync_groups} (name, type) VALUES ('%s', '%s')", $name, $type);
+}
+
+/**
+ * Update CAP group after synchronization.
+ *
+ * @param string $type
+ *   Type of group.
+ * @param string $name
+ *   Machine readable group name.
  * @param int $count
  *   Quantity of profiles associated with this group.
  * @param int $lastsynced
  *   Last synchronization timestamp.
  */
-function stanford_cap_api_profiles_sync_group_save($type, $name, $count = 0, $lastsynced = NULL) {
-  $record = array('name' => $name, 'type' => $type);
-  if (isset($count)) {
-    $record['count'] = $count;
-  }
-  if (isset($lastsynced)) {
-    $record['lastsynced'] = $lastsynced;
-  }
-  db_merge('cap_api_sync_groups')
-    ->key(array('name' => $name, 'type' => $type))
-    ->fields($record)
-    ->execute();
+function stanford_cap_api_profiles_sync_group_update($type, $name, $count, $lastsynced) {
+  db_query("UPDATE cap_api_sync_groups SET count = %d, lastsynced = %d WHERE name = '%s' AND type = '%s'", $count, $lastsynced, $name, $type);
 }
 
 /**
@@ -578,12 +580,12 @@ function stanford_cap_api_profiles_sync_group_sync($type, $name) {
   switch ($type) {
     case 'organization':
       $count = stanford_cap_api_profiles_sync_org_members($name);
-      stanford_cap_api_profiles_sync_group_save($type, $name, $count, REQUEST_TIME);
+      stanford_cap_api_profiles_sync_group_update($type, $name, $count, REQUEST_TIME);
       break;
 
     case 'workgroup':
       $count = stanford_cap_api_profiles_sync_workgroup_members($name);
-      stanford_cap_api_profiles_sync_group_save($type, $name, $count, REQUEST_TIME);
+      stanford_cap_api_profiles_sync_group_update($type, $name, $count, REQUEST_TIME);
       break;
   }
 }
@@ -595,7 +597,7 @@ function stanford_cap_api_profiles_sync_group_sync($type, $name) {
  *   Internal group ID.
  */
 function stanford_cap_api_profiles_sync_group_drop($id) {
-  db_delete('cap_api_sync_groups')->condition('id', $id)->execute();
+  db_query("DELETE FROM {cap_api_sync_groups} WHERE id = %d", $id);
 }
 
 /**
@@ -739,6 +741,10 @@ function stanford_cap_api_profiles_theme() {
       'file' => 'stanford_cap_api_profiles.theme.inc',
     ),
     'stanford_cap_api_profiles_result_tableselect' => array(
+      'arguments' => array('form' => array()),
+      'file' => 'stanford_cap_api_profiles.theme.inc',
+    ),
+    'stanford_cap_api_profiles_sync_groups_tableselect' => array(
       'arguments' => array('form' => array()),
       'file' => 'stanford_cap_api_profiles.theme.inc',
     ),
@@ -1977,7 +1983,7 @@ function _stanford_cap_api_profiles_save_image_file($field_name, $field_data) {
  * Helper for batch to store correct sync time.
  */
 function _stanford_cap_api_profiles_sync_group_save_wrapper($type, $name, $count) {
-  stanford_cap_api_profiles_sync_group_save($type, $name, $count, REQUEST_TIME);
+  stanford_cap_api_profiles_sync_group_update($type, $name, $count, REQUEST_TIME);
 }
 
 /**
@@ -2105,11 +2111,4 @@ function stanford_cap_api_profiles_views_default_views_alter(&$views) {
   if (!variable_get('stanford_cap_api_profiles_schema_synchronized', FALSE) && isset($views['cap_api_manage_profiles'])) {
     $views['cap_api_manage_profiles']->disabled = TRUE;
   }
-}
-
-function test() {
-  $nid = 3;
-  $node = node_load($nid);
-  $terms = taxonomy_node_get_terms($node);
-  dpm($terms);
 }
