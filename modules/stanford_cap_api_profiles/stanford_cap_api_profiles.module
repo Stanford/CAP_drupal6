@@ -1128,6 +1128,9 @@ function _stanford_cap_api_profiles_generate_field_info($drupal_field_name, $fie
         // This is not the real collection.
         // Simple string.
         if (variable_get('stanford_cap_api_import_fields_html', TRUE) && isset($props['html']) && isset($props['text']) && count($props) == 2) {
+          $props['html']['title'] = empty($field_schema['title']) ? $field_name : $field_schema['title'];
+          $props['html']['description'] = empty($field_schema['description']) ? '' : $field_schema['description'];
+          $props['html']['weight'] = empty($props['html']['weight']) ? $field_schema['weight'] : $props['html']['weight'];
           $info = _stanford_cap_api_profiles_gen_field_base_def_text_long($drupal_field_name, $field_name, $props['html'], $drupal_parent_field);
         }
         // Date field.
@@ -1230,7 +1233,7 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
   // Field base
 
   // FC - flexi
-  if ($field_info['type'] == 'flexifield') {
+  if (isset($field_info['type']) && $field_info['type'] == 'flexifield') {
     // @todo: Create a node bundle for flexifield
     $flexi_node = node_get_types('type', $drupal_field_name);
     if (empty($flexi_node)) {
@@ -1241,7 +1244,7 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
       $flexi_node->title_label = t('Title');
       $flexi_node->has_body = 0;
       $flexi_node->body_label = '';
-      $flexi_node->module = 'stanford_cap_api_profiles';
+      $flexi_node->module = 'node';
       $flexi_node->type = $drupal_field_name;
       $flexi_node->custom = FALSE;
       $flexi_node->locked = TRUE;
@@ -1320,8 +1323,10 @@ function _stanford_cap_api_profiles_field_init(&$field_info, $drupal_field_name,
 /**
  * Generate field info for text field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1392,8 +1397,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_text($drupal_field_name, 
 /**
  * Generate field info for text_long field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1464,8 +1471,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_text_long($drupal_field_n
 /**
  * Generate field info for integer field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1535,8 +1544,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_integer($drupal_field_nam
 /**
  * Generate field info for field collection field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1601,8 +1612,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_field_collection($drupal_
 /**
  * Generate field info for boolean field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1672,8 +1685,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_boolean($drupal_field_nam
 /**
  * Generate field info for date field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1753,8 +1768,10 @@ function _stanford_cap_api_profiles_gen_field_base_def_date($drupal_field_name, 
 /**
  * Generate field info for taxonomy_term_reference field.
  *
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
+ * @param string $field_name
+ *   CAP field name.
  * @param array $field_schema
  *   Field schema form CAP API.
  * @param string $parent_field
@@ -1771,7 +1788,7 @@ function _stanford_cap_api_profiles_gen_field_base_def_taxonomy_term_reference($
 
   _stanford_cap_api_profiles_field_init($info, $drupal_field_name, $field_name, $field_schema, $parent_field, $multivalue);
 
-  return $info;
+  return NULL;
 }
 
 /**
