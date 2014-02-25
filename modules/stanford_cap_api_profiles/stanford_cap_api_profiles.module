@@ -1560,7 +1560,7 @@ function _stanford_cap_api_profiles_gen_field_base_def_integer($drupal_field_nam
  * @see field_create_field()
  */
 function _stanford_cap_api_profiles_gen_field_base_def_field_collection($drupal_field_name, $field_name, $field_schema, $parent_field, $multivalue = FALSE) {
-  $items = array($parent_field => $parent_field);
+  $items = array($drupal_field_name => $drupal_field_name);
   $info = array(
     'field_name' => 'field_flexifield',
     'type_name' => 'bundle',
