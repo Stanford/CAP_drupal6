@@ -197,7 +197,8 @@ function stanford_cap_api_profiles_settings_form_submit($form, &$form_state) {
     }
     // Submitted after rebuild.
     else {
-      _stanford_cap_api_profiles_store_sync_field_list($values['fields']);
+      $field_list = array_filter($values['fields']);
+      variable_set('stanford_cap_api_profiles_sync_field_list', $field_list);
       stanford_cap_api_profiles_synchronize_schema(TRUE);
     }
   }
@@ -829,7 +830,7 @@ function _stanford_cap_api_profiles_field_checkboxes($fields, &$parent_elem, $pa
     $field_level = count(explode('.', $field_path));
     $parent_elem[$field_path] = array(
       '#type' => 'checkbox',
-      '#title' => empty($f_schema['title']) ? $field_path : check_plain($f_schema['title']),
+      '#title' => empty($f_schema['title']) ? $f_name : check_plain($f_schema['title']),
       '#description' => empty($f_schema['description']) ? '' : check_plain($f_schema['description']),
       '#return_value' => $field_path,
       '#attributes' => array(
@@ -865,18 +866,4 @@ function _stanford_cap_api_profiles_field_checkboxes($fields, &$parent_elem, $pa
     }
   }
 
-}
-
-/**
- * Stores array of fields to be synchronized in variable.
- *
- * Adds a list of orgCode fields to provided list.
- */
-function _stanford_cap_api_profiles_store_sync_field_list($fields) {
-  $field_list = array_filter($fields);
-  $orgcode_fields = stanford_cap_api_profiles_get_orgcode_fields();
-  if (!empty($orgcode_fields)) {
-    $field_list = array_merge($field_list, $orgcode_fields);
-  }
-  variable_set('stanford_cap_api_profiles_sync_field_list', $field_list);
 }

@@ -6,7 +6,7 @@
 
 include_once 'stanford_cap_api_profiles.features.inc';
 include_once 'stanford_cap_api_profiles.admin.inc';
-define('CAP_FIELDS_PREFIX', 'cap_');
+define('CAP_FIELDS_PREFIX', 'field_cap_');
 define('CAP_FIELDS_IMPORT_ALL', 'import_all');
 define('CAP_FIELDS_IMPORT_LIST', 'import_list');
 
@@ -158,25 +158,16 @@ function stanford_cap_api_profiles_profile_import($profile_id) {
     $action = variable_get('cap_stanford_cap_api_profile_orphaned_action', 'unpublish');
     switch ($action) {
       case 'unpublish':
-        $nid = db_select('cap_api_profiles', 'p')
-          ->condition('profile_id', $profile_id)
-          ->fields('p', array('nid'))
-          ->execute()
-          ->fetchField();
+        $nid = db_result(db_query("SELECT nid FROM {cap_api_profiles} WHERE profile_id = '%s'", $profile_id));
         $node = node_load($nid);
-        $node->status = NODE_NOT_PUBLISHED;
+        $node->status = 0;
         node_save($node);
-        db_delete('cap_api_profiles')
-          ->condition('nid', $nid)
-          ->execute();
+        db_query("DELETE FROM {cap_api_profiles} WHERE profile_id = '%s'", $profile_id);
         break;
 
       case 'remove':
-        $nid = db_select('cap_api_profiles', 'p')
-          ->condition('profile_id', $profile_id)
-          ->fields('p', array('nid'))
-          ->execute()
-          ->fetchField();
+        $nid = db_result(db_query("SELECT nid FROM {cap_api_profiles} WHERE profile_id = '%s'", $profile_id));
+        db_query("DELETE FROM {cap_api_profiles} WHERE profile_id = '%s'", $profile_id);
         node_delete($nid);
         break;
     }
@@ -206,7 +197,7 @@ function stanford_cap_api_profiles_profile_import($profile_id) {
  *   Profile or FALSE.
  */
 function stanford_cap_api_profiles_get_profile($profile_id) {
-  $cache =& drupal_static(__FUNCTION__, array());
+  static $cache = array();
   if (empty($cache[$profile_id])) {
     $cache[$profile_id] = stanford_cap_api_request('/profiles/v1/' . $profile_id);
   }
@@ -251,11 +242,7 @@ function stanford_cap_api_profiles_import_result_finished() {
  *   CAP network profile.
  */
 function stanford_cap_api_profiles_synchronize_data($profile) {
-  $nid = db_select('cap_api_profiles', 'cap')
-    ->fields('cap', array('nid'))
-    ->condition('profile_id', $profile['profileId'])
-    ->execute()
-    ->fetchField();
+  $nid = db_result(db_query("SELECT nid FROM {cap_api_profiles} WHERE profile_id = '%d'", $profile['profileId']));
   $node = $nid ? node_load($nid) : FALSE;
   if ($node) {
     stanford_cap_api_profiles_node_fields_update($node, $profile);
@@ -270,9 +257,6 @@ function stanford_cap_api_profiles_synchronize_data($profile) {
     $node->created = REQUEST_TIME;
     $node->changed = REQUEST_TIME;
     $node->is_new = TRUE;
-    $node->language = LANGUAGE_NONE;
-    node_save($node);
-    $node = node_load($node->nid, NULL, TRUE);
     stanford_cap_api_profiles_node_fields_import($node, $profile);
   }
   // Saving profile<->node association.
@@ -281,10 +265,7 @@ function stanford_cap_api_profiles_synchronize_data($profile) {
     'nid' => $node->nid,
     'etag' => $profile['meta']['etag'],
   );
-  db_merge('cap_api_profiles')
-    ->key(array('profile_id' => $profile['profileId']))
-    ->fields($record)
-    ->execute();
+  drupal_write_record('cap_api_profiles', $record);
 }
 
 /**
@@ -296,38 +277,44 @@ function stanford_cap_api_profiles_synchronize_data($profile) {
  *   Profile fetched from CAP API.
  */
 function stanford_cap_api_profiles_node_fields_import($node, $profile) {
-  $nw = entity_metadata_wrapper('node', $node);
-
   foreach ($profile as $field_name => $field_data) {
-    _stanford_cap_api_profiles_save_field($node, $nw, $field_name, $field_data);
+    _stanford_cap_api_profiles_save_field($node, $field_name, $field_data);
   }
+  _stanford_cap_api_profiles_fill_basic_fields($node, $profile);
+  node_save($node);
 
-  $nw->cap_profile_link->set(array('url' => _stanford_cap_api_profiles_get_cap_profile_url($profile)));
-  $nw->cap_sync_date->set(REQUEST_TIME);
-  // Profile image handling.
-  if (!empty($profile['profilePhotos'])) {
-    $image_type = 'bigger';
-    $fid = _stanford_cap_api_profiles_save_image_file($image_type, $profile['profilePhotos'][$image_type]);
-    if (isset($fid)) {
-      $nw->cap_profile_image = array('fid' => $fid);
-    }
-  }
-  $nw->save();
-  $profile_id = $profile['profileId'];
-  $bundled_fields = array(
-    'cap_profile_link',
-    'cap_sync_date',
-    'cap_profile_image',
-  );
   // Storing profile field hashes to check if data was changed later.
   foreach ($node as $field_name => $field_data) {
-    if (is_array($field_data) && !in_array($field_name, $bundled_fields)) {
+    // Want to store only fields, not node properties.
+    if (is_array($field_data)) {
       $record = array(
-        'profile_id' => $profile_id,
+        'profile_id' => $profile['profileId'],
         'field_name' => $field_name,
         'hash' => $field_data,
       );
       drupal_write_record('cap_api_field_hashes', $record);
+    }
+  }
+}
+
+/**
+ * Set basic profile fields value.
+ *
+ * @param object $node
+ *   Node object.
+ * @param array $profile
+ *   CAP profile array.
+ */
+function _stanford_cap_api_profiles_fill_basic_fields(&$node, $profile) {
+  $node->field_cap_profile_link[0] = array('url' => _stanford_cap_api_profiles_get_cap_profile_url($profile));
+
+  $node->field_cap_sync_date[0] = array('value' => REQUEST_TIME);
+  // Profile image handling.
+  if (!empty($profile['profilePhotos'])) {
+    $image_type = 'bigger';
+    $fid = _stanford_cap_api_profiles_save_image_file($profile['profileId'], $image_type, $profile['profilePhotos'][$image_type]);
+    if ($fid) {
+      $node->field_cap_profile_image[0] = array('fid' => $fid, 'list' => 1, 'data' => array());
     }
   }
 }
@@ -341,40 +328,26 @@ function stanford_cap_api_profiles_node_fields_import($node, $profile) {
  *   Profile fetched from CAP API.
  */
 function stanford_cap_api_profiles_node_fields_update($node, $profile) {
-  $nw = entity_metadata_wrapper('node', $node);
-  $profile_id = $profile['profileId'];
   foreach ($profile as $field_name => $field_data) {
-    $drupal_field_name = _stanford_cap_api_profiles_get_field_name($field_name, '', TRUE);
-    $props_info = $nw->getPropertyInfo();
-    if (isset($props_info[$drupal_field_name])) {
-      if (isset($node->{$drupal_field_name})) {
-        $hash = db_select('cap_api_field_hashes', 'hashes')
-          ->condition('profile_id', $profile_id)
-          ->condition('field_name', $drupal_field_name)
-          ->fields('hashes', array('hash'))
-          ->execute()
-          ->fetchField();
+    $drupal_field_name = _stanford_cap_api_profiles_generate_field_name($field_name);
+    $field_info = content_fields($drupal_field_name, 'cap_stanford_profile');
+    if ($field_info) {
+      if (!empty($node->{$drupal_field_name})) {
+        $hash = db_result(db_query("SELECT hash FROM {cap_api_field_hashes} WHERE profile_id = '%d' AND field_name = '%s'", $profile['profileId'], $drupal_field_name));
         if ($hash == serialize($node->{$drupal_field_name})) {
           // Field data didn't changed till import, this means we can update it.
-          $nw->{$drupal_field_name}->set(NULL);
-          _stanford_cap_api_profiles_save_field($node, $nw, $field_name, $field_data);
+          unset($node->{$drupal_field_name});
+          _stanford_cap_api_profiles_save_field($node, $field_name, $field_data);
         }
       }
       else {
         // We know about this field, but it had no data before.
-        _stanford_cap_api_profiles_save_field($node, $nw, $field_name, $field_data);
+        _stanford_cap_api_profiles_save_field($node, $field_name, $field_data);
       }
     }
   }
-  $nw->cap_profile_link->set(array('url' => _stanford_cap_api_profiles_get_cap_profile_url($profile)));
-  $nw->cap_sync_date->set(REQUEST_TIME);
-  // Profile image handling.
-  $image_type = 'bigger';
-  $fid = _stanford_cap_api_profiles_save_image_file($image_type, $profile['profilePhotos'][$image_type]);
-  if (isset($fid)) {
-    $nw->cap_profile_image = array('fid' => $fid);
-  }
-  $nw->save();
+  node_save($node);
+  // @todo Store updated fields hashes.
 }
 
 /**
@@ -435,10 +408,7 @@ function stanford_cap_api_profiles_get_profile_etag($profile_id) {
 function stanford_cap_api_profiles_get_stored_profile_data($profile_id) {
   $data = FALSE;
   if (is_numeric($profile_id)) {
-    $data = db_select('cap_api_profiles', 'cap')
-      ->fields('cap')
-      ->condition('profile_id', $profile_id)
-      ->execute()->fetchAssoc();
+    $data = db_fetch_array(db_query("SELECT * FROM {cap_api_profiles} WHERE $profile_id = '%d'", $profile_id));
   }
 
   return $data;
@@ -792,56 +762,53 @@ function _stanford_cap_api_profiles_get_cap_profile_url($profile) {
 }
 
 /**
- * Generate Drupal compliant field name or retrieve it from DB.
+ * Generate Drupal compliant field name.
  *
  * @param string $field_name
  *   CAP profile field name.
- * @param string $parent
- *   Full parent field path(e.g "shortTitle.label" for 'label' field attached
- * to 'shortTitle').
- * @param bool $from_db
- *   Indicates whether Drupal field name should be generated or fetched from DB.
  *
  * @return string
  *   Drupal field name.
  */
-function _stanford_cap_api_profiles_get_field_name($field_name, $parent = '', $from_db = FALSE) {
+function _stanford_cap_api_profiles_generate_field_name($field_name) {
   $drupal_field_name = drupal_substr(CAP_FIELDS_PREFIX . drupal_strtolower($field_name), 0, 29);
   $query = "SELECT COUNT(field_name) AS similar_fields FROM {cap_api_fields_map} WHERE field_name LIKE '%s%%'";
-  $result = db_query($query, $drupal_field_name);
-  $similar_fields = 0;
-  if ($result) {
-    $fields = db_fetch_array($result);
-    if (!empty($fields['similar_fields'])) {
-      $similar_fields = (int) $fields['similar_fields'];
-    }
-  }
+  $similar_fields = db_result(db_query($query, $drupal_field_name));
   if ($similar_fields) {
-    if ($from_db) {
-      $field_path = empty($parent) ? $field_name : $parent . '.' . $field_name;
-      $result = db_query("SELECT field_name FROM {cap_api_fields_map} WHERE field_path = '%s'", $field_path);
-      if ($result) {
-        $fields = db_fetch_array($result);
-        if (!empty($fields['field_name'])) {
-          $drupal_field_name = $fields['field_name'];
-        }
-      }
-    }
-    else {
-      $drupal_field_name .= '_' . ++$similar_fields;
-    }
+    $similar_fields = (int) $similar_fields;
+    $drupal_field_name .= '_' . ++$similar_fields;
   }
 
   return $drupal_field_name;
 }
 
 /**
+ * Get field info stored by CAP module by field path.
+ *
+ * @param string $path
+ *   Full field path, like 'education.label.html'.
+ *
+ * @return array
+ *   Array of stored info.
+ * @see stanford_cap_api_profiles_schema()
+ */
+function _stanford_cap_api_profiles_get_field_info_by_path($path) {
+  static $fields = array();
+  if (empty($fields)) {
+    $result = db_query("SELECT * FROM {cap_api_fields_map}");
+    while ($field = db_fetch_array($result)) {
+      $fields[$field['field_path']] = $field;
+    }
+  }
+
+  return isset($fields[$path]) ? $fields[$path] : FALSE;
+}
+
+/**
  * Save CAP profile field value.
  *
- * @param object $entity
- *   Host entity of field.
- * @param object $wrapper
- *   Entity wrapper.
+ * @param object $node
+ *   Node object.
  * @param string $field_name
  *   CAP profile field name.
  * @param array $field_data
@@ -849,43 +816,53 @@ function _stanford_cap_api_profiles_get_field_name($field_name, $parent = '', $f
  * @param string $parent_field
  *   Parent field name.
  */
-function _stanford_cap_api_profiles_save_field(&$entity, &$wrapper, $field_name, $field_data, $parent_field = '') {
-
-  $drupal_field_name = _stanford_cap_api_profiles_get_field_name($field_name, $parent_field, TRUE);
-  $props_info = $wrapper->getPropertyInfo();
-  if (isset($props_info[$drupal_field_name])) {
-    $field_info = field_info_field($drupal_field_name);
+function _stanford_cap_api_profiles_save_field(&$node, $field_name, $field_data, $parent_field = '') {
+  $field_path = empty($parent_field) ? $field_name : $parent_field . '.' . $field_name;
+  $cap_field_info = _stanford_cap_api_profiles_get_field_info_by_path($field_path);
+  if ($cap_field_info) {
+    $drupal_field_name = $cap_field_info['field_name'];
+    $bundle = $cap_field_info['bundle'];
+    $field_info = content_fields($drupal_field_name, $bundle);
     switch ($field_info['type']) {
-      case 'link':
-        if (is_string($field_data)) {
-          $wrapper->{$drupal_field_name}->set(array('url' => $field_data));
-        }
-        break;
-
       case 'date':
         if (is_string($field_data)) {
-          $wrapper->{$drupal_field_name}->set(strtotime($field_data));
+          $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+          $node_field[] = array('value' => $field_data);
         }
-        elseif (!empty($field_data['value'])) {
-          $wrapper->{$drupal_field_name}->set(strtotime($field_data['value']));
+        elseif (!empty($field_data['value']) && is_string($field_data['value'])) {
+          $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+          $node_field[] = array('value' => $field_data['value']);
         }
         break;
 
       case 'text':
-        if (is_string($field_data)) {
-          $value = _stanford_cap_api_profiles_get_field_value_text($field_name, $field_data, $field_info);
-          $wrapper->{$drupal_field_name}->set($value);
-        }
-        elseif (is_array($field_data) && !empty($field_data['html']) && !empty($field_data['text'])) {
-          $field_data = $field_data['text'];
-          $value = _stanford_cap_api_profiles_get_field_value_text($field_name, $field_data, $field_info);
-          $wrapper->{$drupal_field_name}->set($value);
-        }
-        elseif (is_array($field_data) && $field_info['cardinality'] == '-1') {
-          $values = array();
-          foreach ($field_data as $f_data) {
-            if (is_string($f_data)) {
-              $values[] = _stanford_cap_api_profiles_get_field_value_text($field_name, $f_data, $field_info);
+        // They only way to separate text area from text field is to check
+        // what field length is.
+        switch (empty($field_info['max_length'])) {
+          case TRUE:
+            // Text long.
+            if (is_string($field_data)) {
+              $node->{$drupal_field_name}[] = array('value' => $field_data);
+            }
+            elseif (is_array($field_data) && !empty($field_data['html']) && !empty($field_data['text']) && count($field_data) == 2) {
+              $wrapper->{$drupal_field_name}->set(array(
+                'value' => $field_data['html'],
+                'format' => 'full_html_for_cap_profiles',
+              ));
+            }
+            elseif (is_array($field_data) && $field_info['cardinality'] == '-1') {
+              foreach ($field_data as $f_data) {
+                if (!is_string($f_data)) {
+                  $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
+                  $vars = array(
+                    '@field_name' => $field_name,
+                    '@data' => print_r($field_data, TRUE),
+                  );
+                  watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
+                  break;
+                }
+              }
+              $wrapper->{$drupal_field_name}->set($field_data);
             }
             else {
               $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
@@ -894,140 +871,66 @@ function _stanford_cap_api_profiles_save_field(&$entity, &$wrapper, $field_name,
                 '@data' => print_r($field_data, TRUE),
               );
               watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
-            }
-          }
-          $wrapper->{$drupal_field_name}->set($values);
-        }
-        break;
-
-      case 'text_long':
-        if (is_string($field_data)) {
-          // Contains HTML?
-          if ($props_info[$drupal_field_name]['type'] == 'text_formatted') {
-            $wrapper->{$drupal_field_name}->set(array(
-              'value' => $field_data,
-              'format' => 'full_html_for_cap_profiles',
-            ));
-          }
-          else {
-            $wrapper->{$drupal_field_name}->set($field_data);
-          }
-        }
-        elseif (is_array($field_data) && !empty($field_data['html']) && !empty($field_data['text']) && count($field_data) == 2) {
-          $wrapper->{$drupal_field_name}->set(array(
-            'value' => $field_data['html'],
-            'format' => 'full_html_for_cap_profiles',
-          ));
-        }
-        elseif (is_array($field_data) && $field_info['cardinality'] == '-1') {
-          foreach ($field_data as $f_data) {
-            if (!is_string($f_data)) {
-              $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
-              $vars = array(
-                '@field_name' => $field_name,
-                '@data' => print_r($field_data, TRUE),
-              );
-              watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
               break;
             }
-          }
-          $wrapper->{$drupal_field_name}->set($field_data);
-        }
-        else {
-          $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
-          $vars = array(
-            '@field_name' => $field_name,
-            '@data' => print_r($field_data, TRUE),
-          );
-          watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
-          break;
+            break;
+
+          case FALSE:
+            // Text string.
+            if (is_string($field_data)) {
+              $value = _stanford_cap_api_profiles_get_field_value_text($field_name, $field_data, $field_info);
+              $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+              $node_field[] = array('value' => $value);
+            }
+            elseif (is_array($field_data) && !empty($field_data['html']) && !empty($field_data['text'])) {
+              $field_data = $field_data['text'];
+              $value = _stanford_cap_api_profiles_get_field_value_text($field_name, $field_data, $field_info);
+              $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+              $node_field[] = array('value' => $value);
+            }
+            elseif (is_array($field_data) && $field_info['multiple'] == '1') {
+              foreach ($field_data as $f_data) {
+                if (is_string($f_data)) {
+                  $value = _stanford_cap_api_profiles_get_field_value_text($field_name, $f_data, $field_info);
+                  $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+                  $node_field[] = array('value' => $value);
+                }
+                else {
+                  $error_msg = 'Field name: @field_name. Expecting string, got: @data.';
+                  $vars = array(
+                    '@field_name' => $field_name,
+                    '@data' => print_r($field_data, TRUE),
+                  );
+                  watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
+                }
+              }
+            }
+            break;
         }
         break;
 
       case 'number_integer':
         if (is_numeric($field_data)) {
-          $wrapper->{$drupal_field_name}->set($field_data);
+          $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+          $node_field[] = array('value' => $field_data);
         }
         break;
 
-      case 'list_boolean':
-        if (is_bool($field_data)) {
-          $wrapper->{$drupal_field_name}->set($field_data);
-        }
-        break;
-
-      case 'taxonomy_term_reference':
-        if (is_string($field_data)) {
-          $efq = new EntityFieldQuery();
-          $efq->entityCondition('entity_type', 'taxonomy_term');
-          $efq->fieldCondition('field_org_codes', 'value', $field_data);
-          $results = $efq->execute();
-          if (!empty($results['taxonomy_term']) && count($results['taxonomy_term']) == 1) {
-            $org_term = array_shift($results['taxonomy_term']);
-            $wrapper->{$drupal_field_name}->set($org_term);
-          }
-        }
-        break;
-
-      case 'field_collection':
+      case 'flexifield':
         // This is multi-value field collection.
         if (is_array($field_data) && !empty($field_data) && array_key_exists(0, $field_data)) {
           foreach ($field_data as $fc_subfield_data) {
-            _stanford_cap_api_profiles_save_field($entity, $wrapper, $field_name, $fc_subfield_data, $parent_field);
+            _stanford_cap_api_profiles_save_field($node, $field_name, $fc_subfield_data, $parent_field);
           }
         }
         else {
           if (is_array($field_data) && !empty($field_data)) {
-            $fc_item = entity_create('field_collection_item', array('field_name' => $drupal_field_name));
-            $entity_type = method_exists($entity, 'entityType') ? 'field_collection_item' : 'node';
-            $fc_item->setHostEntity($entity_type, $entity);
-            $fc_item->save(TRUE);
-            $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc_item);
-            foreach ($field_data as $fc_subfield => $fc_subfield_data) {
+            foreach ($field_data as $ff_subfield => $ff_subfield_data) {
               $field_path = empty($parent_field) ? $field_name : $parent_field . '.' . $field_name;
-              _stanford_cap_api_profiles_save_field($fc_item, $fc_wrapper, $fc_subfield, $fc_subfield_data, $field_path);
+              _stanford_cap_api_profiles_save_field($node, $ff_subfield, $ff_subfield_data, $field_path);
             }
-            $fc_item->save(TRUE);
           }
         }
-        break;
-
-      case 'image':
-        $ext = drupal_substr($field_data['contentType'], 6);
-        // @todo Remove before release.
-        $request_url = str_replace('cap-irt-dev', 'med', $field_data['url']);
-        parse_str(parse_url($field_data['url'], PHP_URL_QUERY), $query);
-        $profile_id = $query['facultyId'];
-
-        $response = drupal_http_request($request_url);
-        if (property_exists($response, 'error')) {
-          $error_msg = 'Failed to fetch profile image of field %field_name for profile'
-            . ' %profile_id . Error code is'
-            . ' %code, error message is "%msg", request string was "%request".';
-          $vars = array(
-            '%code' => $response->code,
-            '%msg' => $response->status_message,
-            '%request' => $request_url,
-            '%profile_id' => $profile_id,
-            '%field_name' => $field_name,
-          );
-          watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
-
-          break;
-        }
-        $path = 'public://'
-          . variable_get('cap_profile_photos', 'profile_photos')
-          . '/profile_'
-          . $profile_id . '_' . $field_data['type'] . '.' . $ext;
-        $dir = drupal_dirname($path);
-        if (!is_dir($dir) && !mkdir($dir)) {
-          watchdog('stanford_cap_api_profiles', 'Failed to create directory %dir', array('%dir' => $dir), WATCHDOG_WARNING);
-
-          break;
-        }
-        $file = file_save_data($response->data, $path, FILE_EXISTS_REPLACE);
-        $wrapper->{$drupal_field_name}->set(array('fid' => $file->fid));
-
         break;
     }
   }
@@ -1057,7 +960,7 @@ function _stanford_cap_api_profiles_save_field(&$entity, &$wrapper, $field_name,
  *   String to save as field value.
  */
 function _stanford_cap_api_profiles_get_field_value_text($field_name, $field_data, $field_info) {
-  $max_length = $field_info['columns']['value']['length'];
+  $max_length = $field_info['max_length'];
   $data_length = strlen($field_data);
   if ($data_length > $max_length) {
     $value = drupal_substr($field_data, 0, $max_length);
@@ -1088,6 +991,8 @@ function _stanford_cap_api_profiles_get_field_value_text($field_name, $field_dat
  *   Field schema form CAP API.
  * @param string $field_path
  *   Field path for layout.
+ * @param string $drupal_parent_field
+ *   Drupal parent field name.
  *
  * @return array
  *   Array used in field_create_field().
@@ -1149,17 +1054,12 @@ function _stanford_cap_api_profiles_generate_field_info($drupal_field_name, $fie
       break;
 
     case 'string':
-      if ($field_name == 'orgCode') {
-        $info = _stanford_cap_api_profiles_gen_field_base_def_taxonomy_term_reference($drupal_field_name, $field_name, $field_schema, $drupal_parent_field);
+      $clob_fields = variable_get('stanford_cap_api_profiles_text_fields_list', array());
+      if (in_array($field_path, $clob_fields)) {
+        $info = _stanford_cap_api_profiles_gen_field_base_def_text_long($drupal_field_name, $field_name, $field_schema, $drupal_parent_field);
       }
       else {
-        $clob_fields = variable_get('stanford_cap_api_profiles_text_fields_list', array());
-        if (in_array($field_path, $clob_fields)) {
-          $info = _stanford_cap_api_profiles_gen_field_base_def_text_long($drupal_field_name, $field_name, $field_schema, $drupal_parent_field);
-        }
-        else {
-          $info = _stanford_cap_api_profiles_gen_field_base_def_text($drupal_field_name, $field_name, $field_schema, $drupal_parent_field);
-        }
+        $info = _stanford_cap_api_profiles_gen_field_base_def_text($drupal_field_name, $field_name, $field_schema, $drupal_parent_field);
       }
       break;
 
@@ -1202,12 +1102,9 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
   static $field_weigth = 1;
   $field_path = empty($parent_field) ? $f_name : $parent_field . '.' . $f_name;
   // Generate Drupal compliant field name.
-  $drupal_field_name = _stanford_cap_api_profiles_get_field_name($f_name, $parent_field);
+  $drupal_field_name = _stanford_cap_api_profiles_generate_field_name($f_name);
   $field_info = content_fields($drupal_field_name, $drupal_parent_field);
 
-
-
-  // Field base
   if (empty($field_info) && stanford_cap_api_profiles_synchronize_field($field_path)) {
     if (!isset($f_schema['weight'])) {
       $f_schema['weight'] = $field_weigth;
@@ -1230,11 +1127,8 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
       _stanford_cap_api_profiles_store_field_map($drupal_field_name, $field_path, $field_info['type'], $drupal_parent_field);
     }
   }
-  // Field base
 
-  // FC - flexi
   if (isset($field_info['type']) && $field_info['type'] == 'flexifield') {
-    // @todo: Create a node bundle for flexifield
     $flexi_node = node_get_types('type', $drupal_field_name);
     if (empty($flexi_node)) {
       $flexi_node = new stdClass();
@@ -1298,13 +1192,15 @@ function _stanford_cap_api_profiles_field_create($field_info) {
 }
 
 /**
- * Set proper field label, description, wight and cardinality settings in field array.
+ * Set proper field label, description, weight and cardinality settings.
  *
  * @param array $field_info
  *   Field info array to pass to content_field_instance_create().
- * @param string $field_name
+ * @param string $drupal_field_name
  *   Drupal field name.
- * @param array $field_schema
+ * @param string $field_name
+ *   CAP field name.
+ * @param array $schema
  *   Field schema form CAP API.
  * @param string $parent_field
  *   Parent field name.
@@ -1766,32 +1662,6 @@ function _stanford_cap_api_profiles_gen_field_base_def_date($drupal_field_name, 
 }
 
 /**
- * Generate field info for taxonomy_term_reference field.
- *
- * @param string $drupal_field_name
- *   Drupal field name.
- * @param string $field_name
- *   CAP field name.
- * @param array $field_schema
- *   Field schema form CAP API.
- * @param string $parent_field
- *   Parent field name.
- * @param bool $multivalue
- *   Indicates if the field is multivalue.
- *
- * @return array
- *   Array used in field_create_field().
- * @see field_create_field()
- */
-function _stanford_cap_api_profiles_gen_field_base_def_taxonomy_term_reference($drupal_field_name, $field_name, $field_schema, $parent_field, $multivalue = FALSE) {
-  $info = array();
-
-  _stanford_cap_api_profiles_field_init($info, $drupal_field_name, $field_name, $field_schema, $parent_field, $multivalue);
-
-  return NULL;
-}
-
-/**
  * We might want to know largest field size.
  */
 function _stanford_cap_api_profiles_log_longest_field_length($length) {
@@ -1859,6 +1729,8 @@ function _stanford_cap_api_profiles_sync_schema_batch() {
 /**
  * Helper to save profile image to file.
  *
+ * @param int $profile_id
+ *   Profile ID.
  * @param string $field_name
  *   Profile field name.
  * @param array $field_data
@@ -1867,11 +1739,9 @@ function _stanford_cap_api_profiles_sync_schema_batch() {
  * @return int
  *   New file ID or NULL in case of error.
  */
-function _stanford_cap_api_profiles_save_image_file($field_name, $field_data) {
+function _stanford_cap_api_profiles_save_image_file($profile_id, $field_name, $field_data) {
   $ext = drupal_substr($field_data['contentType'], 6);
   $request_url = $field_data['url'];
-  parse_str(parse_url($request_url, PHP_URL_QUERY), $query);
-  $profile_id = $query['facultyId'];
 
   $response = drupal_http_request($request_url);
   if (property_exists($response, 'error')) {
@@ -1888,18 +1758,23 @@ function _stanford_cap_api_profiles_save_image_file($field_name, $field_data) {
     return NULL;
   }
   else {
-    $file_dir = 'cap_profile_images';
-    $path = 'public://'
-      . $file_dir
-      . '/profile_'
-      . $profile_id . '_' . $field_data['type'] . '.' . $ext;
-    $dir = drupal_dirname($path);
-    if (!is_dir($dir) && !mkdir($dir)) {
+    $filename = 'profile_' . $profile_id . '_' . $field_data['type'] . '.' . $ext;
+
+    $path = 'cap_profile_images/' . $filename;
+    if (!($dir = file_create_path($path))) {
       watchdog('stanford_cap_api_profiles', 'Failed to create directory %dir', array('%dir' => $dir), WATCHDOG_WARNING);
 
       return NULL;
     }
-    $file = file_save_data($response->data, $path, FILE_EXISTS_REPLACE);
+    $path = file_save_data($response->data, $path, FILE_EXISTS_REPLACE);
+    $file = new stdClass();
+    $file->filename = $filename;
+    $file->filepath = $path;
+    $file->filemime = file_get_mimetype($file->filename);
+    $file->filesize = filesize(getcwd() . '/' . $path);
+    $file->status = FILE_STATUS_PERMANENT;
+    $file->timestamp = REQUEST_TIME;
+    drupal_write_record('files', $file);
 
     return $file->fid;
   }
@@ -1957,7 +1832,7 @@ function stanford_cap_api_profiles_synchronize_field($field_path) {
  *
  * @return bool
  */
-function _stanford_cap_api_profiles_synchronize_field($field_path, $field_list){
+function _stanford_cap_api_profiles_synchronize_field($field_path, $field_list) {
   $synchronize = FALSE;
   if (in_array($field_path, $field_list)) {
     $synchronize = TRUE;
@@ -1996,39 +1871,6 @@ function _stanford_cap_api_profiles_synchronize_field($field_path, $field_list){
 }
 
 /**
- * Returns list of orgCode fields.
- */
-function stanford_cap_api_profiles_get_orgcode_fields() {
-  $orgcode_fields = array();
-  $schema = stanford_cap_api_profiles_get_profile_schema();
-  foreach ($schema['properties'] as $f_name => $f_schema) {
-    _stanford_cap_api_profiles_get_orgcode_fields($f_name, $f_schema, $orgcode_fields);
-  }
-
-  return $orgcode_fields;
-}
-
-/**
- * Iterates over profile fields to find "orgCode" fields.
- */
-function _stanford_cap_api_profiles_get_orgcode_fields($f_name, $f_schema, &$orgcode_fields, $parent_field = '') {
-  $field_path = empty($parent_field) ? $f_name : $parent_field . '.' . $f_name;
-  if ($f_name == 'orgCode') {
-    $orgcode_fields[] = $field_path;
-  }
-  $subfields = array();
-  if ($f_schema['type'] == 'array' && $f_schema['items']['type'] == 'object') {
-    $subfields = $f_schema['items']['properties'];
-  }
-  elseif ($f_schema['type'] == 'object' && !empty($f_schema['properties'])) {
-    $subfields = $f_schema['properties'];
-  }
-  foreach ($subfields as $subfield => $schema) {
-    _stanford_cap_api_profiles_get_orgcode_fields($subfield, $schema, $orgcode_fields, $field_path);
-  }
-}
-
-/**
  * Implements hook_views_default_views_alter().
  *
  * Disables 'Manage profiles' view if profiles schema not synchronized yet.
@@ -2037,4 +1879,111 @@ function stanford_cap_api_profiles_views_default_views_alter(&$views) {
   if (!variable_get('stanford_cap_api_profiles_schema_synchronized', FALSE) && isset($views['cap_api_manage_profiles'])) {
     $views['cap_api_manage_profiles']->disabled = TRUE;
   }
+}
+
+/**
+ * Prepare node fields data structure.
+ *
+ * Returns link to nodes field new value can be set to.
+ *
+ * @param object $node
+ *   Node object.
+ * @param string $field_name
+ *   CAP field name.
+ * @param string $parent_field
+ *   Parent field name.
+ *
+ * @return array
+ *   Linked to nodes field array.
+ */
+function &_stanford_cap_api_profiles_check_data_structure(&$node, $field_name, $parent_field) {
+  $field_path = empty($parent_field) ? $field_name : $parent_field . '.' . $field_name;
+  $levels = explode('.', $field_path);
+  $level_num = count($levels);
+  $cap_field_info = _stanford_cap_api_profiles_get_field_info_by_path($field_path);
+  $drupal_field_name = $cap_field_info['field_name'];
+  switch ($level_num) {
+    case 1:
+      // Top level field.
+      if (!isset($node->{$drupal_field_name})) {
+        $node->{$drupal_field_name} = array();
+      }
+      else {
+        $field_info = content_fields($drupal_field_name, $cap_field_info['bundle']);
+        // Lets check last value and drop it if empty.
+        $delta = count($node->{$drupal_field_name}) - 1;
+        $empty = TRUE;
+        foreach ($field_info['columns'] as $column => $data) {
+          if (!empty($node->{$drupal_field_name}[$delta][$column])) {
+            $empty = FALSE;
+            break;
+          }
+        }
+        if ($empty) {
+          unset($node->{$drupal_field_name}[$delta]);
+        }
+      }
+      $node_field =& $node->{$drupal_field_name};
+      break;
+
+    default:
+      for ($i = 1; $i < $level_num; $i++) {
+        $path = implode('.', array_slice($levels, 0, $i));
+        $info = _stanford_cap_api_profiles_get_field_info_by_path($path);
+        $field_info = content_fields($info['field_name'], $info['bundle']);
+        if ($i === 1) {
+          // In the first step we must fill in $values array.
+          if (!isset($node->{$info['field_name']})) {
+            $node->{$info['field_name']}[0] = array('value' => array(), 'type' => $info['field_name']);
+            $node_field =& $node->{$info['field_name']}[0]['value'];
+          }
+          else {
+            // Lets check last value and drop it if empty.
+            $delta = count($node->{$info['field_name']}) - 1;
+            $empty = TRUE;
+            foreach ($field_info['columns'] as $column => $data) {
+              if (!empty($node->{$info['field_name']}[$delta][$column])) {
+                $empty = FALSE;
+                break;
+              }
+            }
+            if ($empty) {
+              unset($node->{$info['field_name']}[$delta]);
+            }
+
+            $node->{$info['field_name']}[] = array('value' => array(), 'type' => $info['field_name']);
+            $delta = count($node->{$info['field_name']}) - 1;
+            $node_field =& $node->{$info['field_name']}[$delta]['value'];
+          }
+        }
+        else {
+          if (!isset($node_field[$info['field_name']])) {
+            $node_field[$info['field_name']][0] = array('value' => array(), 'type' => $info['field_name']);
+            $node_field =& $node_field[$info['field_name']][0]['value'];
+          }
+          else {
+            // Lets check last value and drop it if empty.
+            $delta = count($node_field[$info['field_name']]) - 1;
+            $empty = TRUE;
+            foreach ($field_info['columns'] as $column => $data) {
+              if (!empty($node_field[$info['field_name']][$delta][$column])) {
+                $empty = FALSE;
+                break;
+              }
+            }
+            if ($empty) {
+              unset($node_field[$info['field_name']][$delta]);
+            }
+
+            $node_field[$info['field_name']][] = array('value' => array(), 'type' => $info['field_name']);
+            $delta = count($node_field[$info['field_name']]) - 1;
+            $node_field =& $node_field[$info['field_name']][$delta]['value'];
+          }
+        }
+      }
+      $node_field[$drupal_field_name] = array();
+      $node_field =& $node_field[$drupal_field_name];
+  }
+
+  return $node_field;
 }
