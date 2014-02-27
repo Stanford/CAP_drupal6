@@ -265,7 +265,78 @@ function stanford_cap_api_profiles_synchronize_data($profile) {
     'nid' => $node->nid,
     'etag' => $profile['meta']['etag'],
   );
-  drupal_write_record('cap_api_profiles', $record);
+  $id = db_result(db_query("SELECT id FROM {cap_api_profiles} WHERE profile_id = %d", $profile['profileId']));
+  if ($id) {
+    $record['id'] = $id;
+    drupal_write_record('cap_api_profiles', $record, 'id');
+  }
+  else {
+    drupal_write_record('cap_api_profiles', $record);
+  }
+}
+
+/**
+ * Get organization code for profile.
+ *
+ * @param array $profile
+ *   CAP profile.
+ *
+ * @return string
+ *   Organization code string or NULL.
+ */
+function _stanford_cap_api_profiles_get_organtization_code($profile) {
+  $code = NULL;
+
+  if (!empty($profile['shortTitle']) && !empty($profile['shortTitle']['organization']) && !empty($profile['shortTitle']['organization']['orgCode'])) {
+    $code = $profile['shortTitle']['organization']['orgCode'];
+  }
+
+  if (empty($code) && !empty($profile['longTitle']) && !empty($profile['longTitle']['organization']) && !empty($profile['longTitle']['organization']['orgCode'])) {
+    $code = $profile['longTitle']['organization']['orgCode'];
+  }
+
+  return $code;
+}
+
+/**
+ * Set basic profile fields value.
+ *
+ * @param object $node
+ *   Node object.
+ * @param array $profile
+ *   CAP profile array.
+ */
+function _stanford_cap_api_profiles_fill_basic_fields(&$node, $profile) {
+  $node->field_cap_profile_link[0] = array('url' => _stanford_cap_api_profiles_get_cap_profile_url($profile));
+
+  $node->field_cap_sync_date[0] = array('value' => REQUEST_TIME);
+
+  // Profile image handling.
+  if (!empty($profile['profilePhotos'])) {
+    $image_type = 'bigger';
+    $file = _stanford_cap_api_profiles_save_image_file($profile['profileId'], $image_type, $profile['profilePhotos'][$image_type]);
+    if ($file) {
+      $value = array(
+        'fid' => $file->fid,
+        'filepath' => $file->filepath,
+        'list' => 1,
+        'data' => array(),
+      );
+      $node->field_cap_profile_image[0] = $value;
+    }
+  }
+
+  // Setting taxonomy.
+  $taxonomy = array();
+  $org_code = _stanford_cap_api_profiles_get_organtization_code($profile);
+  if ($org_code) {
+    $terms = taxonomy_get_term_by_name($org_code);
+    if (!empty($terms)) {
+      $term = array_shift($terms);
+      $taxonomy[variable_get('stanford_cap_api_orgs_vid', 0)][$term->tid] = $term->tid;
+      $node->taxonomy = $taxonomy;
+    }
+  }
 }
 
 /**
@@ -298,28 +369,6 @@ function stanford_cap_api_profiles_node_fields_import($node, $profile) {
 }
 
 /**
- * Set basic profile fields value.
- *
- * @param object $node
- *   Node object.
- * @param array $profile
- *   CAP profile array.
- */
-function _stanford_cap_api_profiles_fill_basic_fields(&$node, $profile) {
-  $node->field_cap_profile_link[0] = array('url' => _stanford_cap_api_profiles_get_cap_profile_url($profile));
-
-  $node->field_cap_sync_date[0] = array('value' => REQUEST_TIME);
-  // Profile image handling.
-  if (!empty($profile['profilePhotos'])) {
-    $image_type = 'bigger';
-    $fid = _stanford_cap_api_profiles_save_image_file($profile['profileId'], $image_type, $profile['profilePhotos'][$image_type]);
-    if ($fid) {
-      $node->field_cap_profile_image[0] = array('fid' => $fid, 'list' => 1, 'data' => array());
-    }
-  }
-}
-
-/**
  * Update profile fields in node.
  *
  * @param object $node
@@ -346,8 +395,28 @@ function stanford_cap_api_profiles_node_fields_update($node, $profile) {
       }
     }
   }
+  _stanford_cap_api_profiles_fill_basic_fields($node, $profile);
   node_save($node);
-  // @todo Store updated fields hashes.
+  // Storing profile field hashes to check if data was changed later.
+  foreach ($node as $field_name => $field_data) {
+    // Want to store only fields, not node properties.
+    if (is_array($field_data)) {
+      $record = array(
+        'profile_id' => $profile['profileId'],
+        'field_name' => $field_name,
+        'hash' => $field_data,
+      );
+      $id = db_result(db_query("SELECT id FROM {cap_api_field_hashes} WHERE profile_id = %d AND field_name = '%s'", $profile['profileId'], $field_name));
+      if ($id) {
+        // This field hash were stored already.
+        $record['id'] = $id;
+        drupal_write_record('cap_api_field_hashes', $record , 'id');
+      }
+      else {
+        drupal_write_record('cap_api_field_hashes', $record);
+      }
+    }
+  }
 }
 
 /**
@@ -1759,8 +1828,21 @@ function _stanford_cap_api_profiles_save_image_file($profile_id, $field_name, $f
   }
   else {
     $filename = 'profile_' . $profile_id . '_' . $field_data['type'] . '.' . $ext;
+    $path = file_directory_path() . '/cap_profile_images/' . $filename;
+    $file_full_path = getcwd() . '/' . $path;
+    // Check if file exists and size doesn't changed.
+    if (file_exists($file_full_path) && filesize($file_full_path) == strlen($response->data)) {
+      $fid = db_result(db_query("SELECT fid FROM {files} WHERE filepath = '%s'", $path));
+      if ($fid) {
+        // File have entry in DB, nothing to do.
+        $file = new stdClass();
+        $file->fid = $fid;
+        $file->filepath = $path;
 
-    $path = 'cap_profile_images/' . $filename;
+        return $file;
+      }
+    }
+
     if (!($dir = file_create_path($path))) {
       watchdog('stanford_cap_api_profiles', 'Failed to create directory %dir', array('%dir' => $dir), WATCHDOG_WARNING);
 
@@ -1776,7 +1858,7 @@ function _stanford_cap_api_profiles_save_image_file($profile_id, $field_name, $f
     $file->timestamp = REQUEST_TIME;
     drupal_write_record('files', $file);
 
-    return $file->fid;
+    return $file;
   }
 }
 

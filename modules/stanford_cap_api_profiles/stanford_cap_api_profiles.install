@@ -11,6 +11,9 @@
  */
 function stanford_cap_api_profiles_install() {
   drupal_install_schema('stanford_cap_api_profiles');
+  // Allow profiles to be tagged with orgCode terms.
+  $vid = variable_get('stanford_cap_api_orgs_vid', 0);
+  db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES ('%s', '%s')", $vid, 'cap_stanford_profile');
 }
 
 /**
