@@ -472,26 +472,29 @@ function stanford_cap_api_profiles_import_result_form_submit($form, &$form_state
  * Remove all CAP profile fields from system.
  */
 function stanford_cap_api_profiles_reset() {
-  $fields = db_select('cap_api_fields', 'f')->fields('f', array('field_name'))
-    ->execute()->fetchCol();
+  $result = db_query("SELECT field_name FROM {cap_api_fields_map}");
   $operations = array();
-  foreach ($fields as $field) {
-    if (field_read_field($field)) {
-      $operations[] = array(
-        'field_delete_field',
-        array($field),
-      );
-      $operations[] = array(
-        'field_purge_batch',
-        array(1),
-      );
-    }
+  while ($field_name = db_result($result)) {
+    $operations[] = array(
+      'content_field_instance_delete',
+      array($field_name, 'cap_stanford_profile', FALSE),
+    );
   }
+  $operations[] = array(
+    'content_clear_type_cache',
+    array(TRUE),
+  );
+  $operations[] = array(
+    'menu_rebuild',
+    array(),
+  );
+
+
   batch_set(array('operations' => $operations));
-  db_delete('cap_api_fields')->execute();
+  db_query("DELETE FROM {cap_api_fields_map}");
   variable_del('stanford_cap_api_profiles_schema_synchronized');
   variable_del('stanford_cap_api_profiles_schema_hash');
-  drupal_set_message(t('Stanford profile content type has being resetted to default.'));
+  drupal_set_message(t('Stanford profile content type has been reset to default.'));
 }
 
 /**
