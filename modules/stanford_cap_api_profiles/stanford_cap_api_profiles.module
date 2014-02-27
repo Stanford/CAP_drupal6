@@ -639,12 +639,9 @@ function stanford_cap_api_profiles_sync_group_drop($id) {
  * Callback for cron groups synchronization.
  */
 function stanford_cap_api_profiles_sync_group_cron() {
-  $groups = db_select('cap_api_sync_groups', 'groups')
-    ->fields('groups')
-    ->execute()
-    ->fetchAll();
-  foreach ($groups as $group) {
-    stanford_cap_api_profiles_sync_group_sync($group->type, $group->name);
+  $result = db_query("SELECT * FROM {cap_api_sync_groups}");
+  while ($group = db_fetch_array($result)) {
+    stanford_cap_api_profiles_sync_group_sync($group['type'], $group['name']);
   }
 }
 
