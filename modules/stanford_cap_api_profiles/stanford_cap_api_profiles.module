@@ -646,12 +646,12 @@ function stanford_cap_api_profiles_sync_group_cron() {
 }
 
 /**
- * Implements hook_node_delete().
+ * Implements hook_nodeapi().
  */
-function stanford_cap_api_profiles_node_delete($node) {
-  db_delete('cap_api_profiles')
-    ->condition('nid', $node->nid)
-    ->execute();
+function stanford_cap_api_profiles_nodeapi(&$node, $op) {
+  if ($op == 'delete' && $node->type == 'cap_stanford_profile') {
+    db_query("DELETE FROM {cap_api_profiles} WHERE nid = %d", $node->nid);
+  }
 }
 
 /**
