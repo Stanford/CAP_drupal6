@@ -476,8 +476,8 @@ function stanford_cap_api_profiles_reset() {
   $operations = array();
   while ($field_name = db_result($result)) {
     $operations[] = array(
-      'content_field_instance_delete',
-      array($field_name, 'cap_stanford_profile', FALSE),
+      '_stanford_cap_api_profiles_reset_batch',
+      array($field_name),
     );
   }
   $operations[] = array(
@@ -488,13 +488,22 @@ function stanford_cap_api_profiles_reset() {
     'menu_rebuild',
     array(),
   );
-
-
   batch_set(array('operations' => $operations));
   db_query("DELETE FROM {cap_api_fields_map}");
   variable_del('stanford_cap_api_profiles_schema_synchronized');
   variable_del('stanford_cap_api_profiles_schema_hash');
   drupal_set_message(t('Stanford profile content type has been reset to default.'));
+}
+
+/**
+ * Helper for batch operations.
+ *
+ * @param string $field_name
+ *   Field name.
+ */
+function _stanford_cap_api_profiles_reset_batch($field_name) {
+  module_load_include('inc', 'content', 'includes/content.crud');
+  content_field_instance_delete($field_name, 'cap_stanford_profile', FALSE);
 }
 
 /**
