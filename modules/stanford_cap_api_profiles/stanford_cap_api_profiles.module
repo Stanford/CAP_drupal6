@@ -99,12 +99,17 @@ function stanford_cap_api_profiles_perm() {
  */
 function stanford_cap_api_profiles_menu_alter(&$items) {
   $items['node/%node/edit']['access callback'] = 'stanford_cap_api_profiles_node_access';
-  $items['admin/structure/types/manage/%node_type/fields']['access callback'] = 'stanford_cap_api_profiles_user_access';
-  $items['admin/structure/types/manage/%node_type/fields']['access arguments'][] = 4;
+  $content_type = content_types('cap_stanford_profile');
+  $items['admin/content/node-type/' . $content_type['url_str'] . '/fields']['access callback'] = 'stanford_cap_api_profiles_user_access';
+  foreach ((array) $content_type['fields'] as $field) {
+    $items['admin/content/node-type/' . $content_type['url_str'] . '/fields/' . $field['field_name']]['access callback'] = 'stanford_cap_api_profiles_user_access';
+  }
 }
 
 /**
  * Access check callback.
+ *
+ * Disables access to node edit page for profile nodes.
  */
 function stanford_cap_api_profiles_node_access($op, $node) {
   $access = node_access($op, $node);
@@ -119,10 +124,12 @@ function stanford_cap_api_profiles_node_access($op, $node) {
 
 /**
  * Access check callback.
+ *
+ * Disables manage fields page for profile node type.
  */
-function stanford_cap_api_profiles_user_access($permission, $node_type) {
+function stanford_cap_api_profiles_user_access($permission) {
   $access = user_access($permission);
-  if ($access && $node_type->type == 'cap_stanford_profile') {
+  if ($access) {
     if (!variable_get('stanford_cap_api_profile_custom_fields', FALSE)) {
       $access = FALSE;
     }
