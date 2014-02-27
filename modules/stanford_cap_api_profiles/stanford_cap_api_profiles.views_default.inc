@@ -20,7 +20,8 @@ function stanford_cap_api_profiles_views_default_views() {
   /* Display: Defaults */
   $handler = $view->new_display('default', 'Defaults', 'default');
   $handler->display->display_options['title'] = 'Manage profiles';
-  $handler->display->display_options['access']['type'] = 'none';
+  $handler->display->display_options['access']['type'] = 'perm';
+  $handler->display->display_options['access']['perm'] = 'administer cap api';
   $handler->display->display_options['cache']['type'] = 'none';
   $handler->display->display_options['query']['type'] = 'views_query';
   $handler->display->display_options['exposed_form']['type'] = 'basic';
@@ -79,7 +80,7 @@ function stanford_cap_api_profiles_views_default_views() {
     ),
     'views_bulk_operations_delete_node_action' => array(
       'selected' => 1,
-      'skip_confirmation' => 0,
+      'skip_confirmation' => 1,
       'label' => 'Remove profile',
     ),
     'node_mass_update-a27b9efabcd054685a549378b174ad11' => array(
@@ -182,6 +183,11 @@ function stanford_cap_api_profiles_views_default_views() {
     'system_send_email_action' => array(
       'selected' => 0,
       'skip_confirmation' => 0,
+      'label' => '',
+    ),
+    'stanford_cap_api_profiles_profile_stop_sync_action' => array(
+      'selected' => 1,
+      'skip_confirmation' => 1,
       'label' => '',
     ),
     'node_mass_update-0ccad85c1ebe4c9ceada1aa64293b080' => array(
