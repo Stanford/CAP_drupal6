@@ -461,7 +461,7 @@ function stanford_cap_api_profiles_import_result_form_submit($form, &$form_state
     $batch = array(
       'title' => t('Importing profiles'),
       'operations' => $operations,
-      'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total | Estimate: @estimate | Elapsed: @elapsed'),
+      'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total'),
       'finished' => 'stanford_cap_api_profiles_import_result_finished',
     );
     batch_set($batch);
@@ -654,7 +654,7 @@ function stanford_cap_api_profiles_group_sync_form_submit($form, &$form_state) {
     $batch = array(
       'title' => t('Synchronizing group profiles'),
       'operations' => $operations,
-      'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total | Estimate: @estimate | Elapsed: @elapsed'),
+      'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total'),
     );
     batch_set($batch);
   }
@@ -748,7 +748,7 @@ function stanford_cap_api_profiles_group_sync_now($id) {
   $batch = array(
     'title' => t('Synchronizing group profiles'),
     'operations' => $operations,
-    'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total | Estimate: @estimate | Elapsed: @elapsed'),
+    'progress_message' => t('Current: @current | Remaining: @remaining | Total: @total'),
   );
   batch_set($batch);
   batch_process('admin/settings/cap/config/group');

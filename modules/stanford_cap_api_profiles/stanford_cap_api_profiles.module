@@ -224,6 +224,7 @@ function stanford_cap_api_profiles_get_profile($profile_id) {
  *   Type.
  */
 function stanford_cap_api_profiles_get_profile_type($profile) {
+  $type = NULL;
   foreach ($profile['affiliations'] as $affiliation => $enabled) {
     if ($affiliation == 'capFaculty' && $enabled) {
       $type = 'faculty';
@@ -1801,8 +1802,8 @@ function _stanford_cap_api_profiles_sync_schema_batch() {
  * @param array $field_data
  *   Field data.
  *
- * @return int
- *   New file ID or NULL in case of error.
+ * @return object
+ *   File or NULL in case of error.
  */
 function _stanford_cap_api_profiles_save_image_file($profile_id, $field_name, $field_data) {
   $ext = drupal_substr($field_data['contentType'], 6);
