@@ -672,9 +672,9 @@ function stanford_cap_api_profiles_action_info() {
   return array(
     'stanford_cap_api_profiles_profile_stop_sync_action' => array(
       'type' => 'node',
-      'label' => t('Stop profile synchronization'),
+      'description' => t('Stop profile synchronization'),
       'configurable' => FALSE,
-      'triggers' => array(),
+      'hooks' => array('any' => TRUE),
     ),
   );
 }
@@ -682,17 +682,16 @@ function stanford_cap_api_profiles_action_info() {
 /**
  * Stop profile syncing action.
  */
-function stanford_cap_api_profiles_profile_stop_sync_action($entity) {
-  if ($entity->type == 'cap_stanford_profile') {
-    $count = db_update('cap_api_profiles')
-      ->condition('nid', $entity->nid)
-      ->fields(array('sync' => 0))
-      ->execute();
+function stanford_cap_api_profiles_profile_stop_sync_action($node) {
+  if ($node->type == 'cap_stanford_profile') {
+    db_query("UPDATE {cap_api_profiles} SET sync = 0 WHERE nid = %d", $node->nid);
+    $count = db_affected_rows();
     if ($count == 1) {
+      $profile_id = db_result(db_query("SELECT profile_id FROM {cap_api_profiles} WHERE nid = %d", $node->nid));
       watchdog(
         'stanford_cap_api_profiles',
-        'Profile with ID %ID will not be synced anymore.',
-        array('%ID' => $entity->cap_profileid[LANGUAGE_NONE][0]['value'])
+        'Profile with ID %id will not be synced anymore.',
+        array('%id' => $profile_id)
       );
     }
   }
