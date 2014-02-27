@@ -20,6 +20,11 @@ function stanford_cap_api_profiles_uninstall() {
   drupal_uninstall_schema('stanford_cap_api_profiles');
   variable_del('stanford_cap_api_profiles_text_fields_list');
   // @todo: Collect all variables and add them here.
+
+  $result = db_query("SELECT nid FROM {node} WHERE type = 'cap_stanford_profile'");
+  while ($nid = db_result($result)) {
+    node_delete($nid);
+  }
 }
 
 
