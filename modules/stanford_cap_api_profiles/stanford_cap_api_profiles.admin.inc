@@ -723,17 +723,9 @@ function stanford_cap_api_profiles_group_sync_drop_form_submit($form, &$form_sta
  * Starts profiles group synchronization.
  */
 function stanford_cap_api_profiles_group_sync_now($id) {
-  $group = db_select('cap_api_sync_groups', 'groups')
-    ->condition('id', $id)
-    ->fields('groups')
-    ->execute()
-    ->fetchAssoc();
+  $group = db_fetch_array(db_query("SELECT * FROM {cap_api_sync_groups} WHERE id = %d", $id));
   $operations = array();
   $count = 0;
-  $operations[] = array(
-    'stanford_cap_api_profiles_sync_group_save',
-    array($group['type'], $group['name'], NULL, NULL),
-  );
   switch ($group['type']) {
     case 'organization':
       $count = stanford_cap_api_profiles_sync_org_members($group['name'], $operations);
