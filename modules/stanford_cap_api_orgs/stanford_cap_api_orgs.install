@@ -31,4 +31,8 @@ function stanford_cap_api_orgs_uninstall() {
   taxonomy_del_vocabulary(variable_get('stanford_cap_api_orgs_vid', 0));
   variable_del('stanford_cap_api_orgs_vid');
   variable_del('stanford_cap_api_orgs_import_started');
+  $result = db_query("SELECT nid FROM {node} WHERE type = 'stanford_organization'");
+  while ($nid = db_result($result)) {
+    node_delete($nid);
+  }
 }
