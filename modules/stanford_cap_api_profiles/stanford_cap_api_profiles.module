@@ -417,7 +417,7 @@ function stanford_cap_api_profiles_node_fields_update($node, $profile) {
       if ($id) {
         // This field hash were stored already.
         $record['id'] = $id;
-        drupal_write_record('cap_api_field_hashes', $record , 'id');
+        drupal_write_record('cap_api_field_hashes', $record, 'id');
       }
       else {
         drupal_write_record('cap_api_field_hashes', $record);
@@ -442,11 +442,10 @@ function stanford_cap_api_profiles_profile_import_multiple($profile_ids) {
  * Updates already imported profiles.
  */
 function stanford_cap_api_profiles_update_profiles() {
-  $profile_ids = db_select('cap_api_profiles', 'profiles')
-    ->fields('profiles', array('profile_id'))
-    ->execute()
-    ->fetchCol();
-  stanford_cap_api_profiles_profile_import_multiple($profile_ids);
+  $result = db_query("SELECT profile_id FROM {cap_api_profiles}");
+  while ($profile_id = db_result($result)) {
+    stanford_cap_api_profiles_profile_import($profile_id);
+  }
 }
 
 /**
