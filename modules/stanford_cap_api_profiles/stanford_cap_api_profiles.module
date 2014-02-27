@@ -9,6 +9,8 @@ include_once 'stanford_cap_api_profiles.admin.inc';
 define('CAP_FIELDS_PREFIX', 'field_cap_');
 define('CAP_FIELDS_IMPORT_ALL', 'import_all');
 define('CAP_FIELDS_IMPORT_LIST', 'import_list');
+define('CAP_PROFILES_UPDATE_ON_VIEW', 'viewing');
+define('CAP_PROFILES_UPDATE_NIGHTLY', 'nightly');
 
 /**
  * Implements hook_menu().
@@ -652,21 +654,13 @@ function stanford_cap_api_profiles_nodeapi(&$node, $op) {
   if ($op == 'delete' && $node->type == 'cap_stanford_profile') {
     db_query("DELETE FROM {cap_api_profiles} WHERE nid = %d", $node->nid);
   }
-}
-
-/**
- * Implements hook_node_view().
- */
-function stanford_cap_api_profiles_node_view($node, $view_mode) {
-  $update_strategy = variable_get('stanford_cap_api_profile_update', 'nightly');
-  if ($node->type == 'cap_stanford_profile' && $view_mode == 'full' && $update_strategy == 'viewing') {
-    $profile_id = db_select('cap_api_profiles', 'p')
-      ->condition('nid', $node->nid)
-      ->fields('p', array('profile_id'))
-      ->execute()
-      ->fetchField();
-    if ($profile_id) {
-      stanford_cap_api_profiles_profile_import($profile_id);
+  elseif($op == 'view' && $node->type == 'cap_stanford_profile') {
+    $update_strategy = variable_get('stanford_cap_api_profile_update', CAP_PROFILES_UPDATE_NIGHTLY);
+    if ($update_strategy == CAP_PROFILES_UPDATE_ON_VIEW) {
+      $profile_id = db_result(db_query("SELECT profile_id FROM {cap_api_profiles} WHERE nid = %d", $node->nid));
+      if ($profile_id) {
+        stanford_cap_api_profiles_profile_import($profile_id);
+      }
     }
   }
 }

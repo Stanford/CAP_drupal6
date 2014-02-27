@@ -147,10 +147,10 @@ function stanford_cap_api_profiles_form_stanford_cap_api_settings_form_alter(&$f
     $form['refresh']['stanford_cap_api_profile_update'] = array(
       '#type' => 'radios',
       '#title' => t('CAP Profiles can be updated regularly to ensure you have the latest content available for the site'),
-      '#default_value' => variable_get('stanford_cap_api_profile_update', 'nightly'),
+      '#default_value' => variable_get('stanford_cap_api_profile_update', CAP_PROFILES_UPDATE_NIGHTLY),
       '#options' => array(
-        'viewing' => t('When viewing the profile.'),
-        'nightly' => t('Nightly.'),
+        CAP_PROFILES_UPDATE_ON_VIEW => t('When viewing the profile.'),
+        CAP_PROFILES_UPDATE_NIGHTLY => t('Nightly.'),
       ),
     );
 
