@@ -408,7 +408,7 @@ function stanford_cap_api_profiles_get_profile_etag($profile_id) {
 function stanford_cap_api_profiles_get_stored_profile_data($profile_id) {
   $data = FALSE;
   if (is_numeric($profile_id)) {
-    $data = db_fetch_array(db_query("SELECT * FROM {cap_api_profiles} WHERE $profile_id = '%d'", $profile_id));
+    $data = db_fetch_array(db_query("SELECT * FROM {cap_api_profiles} WHERE profile_id = %d", $profile_id));
   }
 
   return $data;
