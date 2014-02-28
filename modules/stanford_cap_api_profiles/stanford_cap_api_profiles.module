@@ -102,9 +102,13 @@ function stanford_cap_api_profiles_perm() {
 function stanford_cap_api_profiles_menu_alter(&$items) {
   $items['node/%node/edit']['access callback'] = 'stanford_cap_api_profiles_node_access';
   $content_type = content_types('cap_stanford_profile');
-  $items['admin/content/node-type/' . $content_type['url_str'] . '/fields']['access callback'] = 'stanford_cap_api_profiles_user_access';
-  foreach ((array) $content_type['fields'] as $field) {
-    $items['admin/content/node-type/' . $content_type['url_str'] . '/fields/' . $field['field_name']]['access callback'] = 'stanford_cap_api_profiles_user_access';
+  // If content type is not defined yet returned value will be array
+  // with some empty values.
+  if (!empty($content_type['url_str'])) {
+    $items['admin/content/node-type/' . $content_type['url_str'] . '/fields']['access callback'] = 'stanford_cap_api_profiles_user_access';
+    foreach ((array) $content_type['fields'] as $field) {
+      $items['admin/content/node-type/' . $content_type['url_str'] . '/fields/' . $field['field_name']]['access callback'] = 'stanford_cap_api_profiles_user_access';
+    }
   }
 }
 
@@ -1206,6 +1210,7 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
       $flexi_node->body_label = '';
       $flexi_node->module = 'node';
       $flexi_node->type = $drupal_field_name;
+      $flexi_node->orig_type = '';
       $flexi_node->custom = FALSE;
       $flexi_node->locked = TRUE;
       $flexi_node->modified = FALSE;
