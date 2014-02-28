@@ -1173,8 +1173,14 @@ function _stanford_cap_api_profiles_generate_field_info($drupal_field_name, $fie
 function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_schema, $drupal_parent_field = '', $parent_field = '', &$operations = NULL) {
   static $field_weigth = 1;
   $field_path = empty($parent_field) ? $f_name : $parent_field . '.' . $f_name;
-  // Generate Drupal compliant field name.
-  $drupal_field_name = _stanford_cap_api_profiles_generate_field_name($f_name);
+  $cap_field_info = _stanford_cap_api_profiles_get_field_info_by_path($field_path);
+  if (empty($cap_field_info['field_name'])) {
+    // Generate Drupal compliant field name.
+    $drupal_field_name = _stanford_cap_api_profiles_generate_field_name($f_name);
+  }
+  else {
+    $drupal_field_name = $cap_field_info['field_name'];
+  }
   $field_info = content_fields($drupal_field_name, $drupal_parent_field);
 
   if (empty($field_info) && stanford_cap_api_profiles_synchronize_field($field_path)) {
