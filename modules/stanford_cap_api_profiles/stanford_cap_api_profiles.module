@@ -912,15 +912,14 @@ function _stanford_cap_api_profiles_save_field(&$node, $field_name, $field_data,
           case TRUE:
             // Text long.
             if (is_string($field_data)) {
-              $node->{$drupal_field_name}[] = array('value' => $field_data);
+              $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+              $node_field[] = array('value' => $field_data, 'format' => stanford_cap_api_profiles_get_format());
             }
             elseif (is_array($field_data) && !empty($field_data['html']) && !empty($field_data['text']) && count($field_data) == 2) {
-              $wrapper->{$drupal_field_name}->set(array(
-                'value' => $field_data['html'],
-                'format' => 'full_html_for_cap_profiles',
-              ));
+              $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+              $node_field[] = array('value' => $field_data['html'], 'format' => stanford_cap_api_profiles_get_format());
             }
-            elseif (is_array($field_data) && $field_info['cardinality'] == '-1') {
+            elseif (is_array($field_data) && $field_info['multiple'] == '1') {
               foreach ($field_data as $f_data) {
                 if (!is_string($f_data)) {
                   $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
@@ -931,8 +930,11 @@ function _stanford_cap_api_profiles_save_field(&$node, $field_name, $field_data,
                   watchdog('stanford_cap_api_profiles', $error_msg, $vars, WATCHDOG_WARNING);
                   break;
                 }
+                else {
+                  $node_field =& _stanford_cap_api_profiles_check_data_structure($node, $field_name, $parent_field);
+                  $node_field[] = array('value' => $f_data, 'format' => stanford_cap_api_profiles_get_format());
+                }
               }
-              $wrapper->{$drupal_field_name}->set($field_data);
             }
             else {
               $error_msg = 'Field name: @field_name. Expecting string , got: @data.';
@@ -2070,4 +2072,23 @@ function &_stanford_cap_api_profiles_check_data_structure(&$node, $field_name, $
   }
 
   return $node_field;
+}
+
+/**
+ * Returns format ID for CAP profiles.
+ *
+ * @return int
+ *   Format ID.
+ */
+function stanford_cap_api_profiles_get_format() {
+  $format = variable_get('stanford_cap_api_profiles_format', NULL);
+  if (!$format) {
+    $format = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Full HTML for CAP profiles'"));
+    variable_set('stanford_cap_api_profiles_format', $format);
+  }
+  if (!$format) {
+    $format = variable_get('filter_default_format', 1);
+  }
+
+  return $format;
 }
