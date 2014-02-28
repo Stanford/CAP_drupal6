@@ -34,9 +34,6 @@ function stanford_cap_api_profiles_content_default_fields() {
     'multiple' => '0',
     'module' => 'filefield',
     'active' => '1',
-    'list_field' => '0',
-    'list_default' => 1,
-    'description_field' => '0',
     'widget' => array(
       'file_extensions' => 'png gif jpg jpeg',
       'file_path' => 'cap_profile_images',
