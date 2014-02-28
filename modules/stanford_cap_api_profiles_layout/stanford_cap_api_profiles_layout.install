@@ -6,6 +6,13 @@
  */
 
 /**
+ * Implements hook_install().
+ */
+function stanford_cap_api_profiles_layout_install() {
+  drupal_install_schema('stanford_cap_api_profiles_layout');
+}
+
+/**
  * Implements hook_schema().
  */
 function stanford_cap_api_profiles_layout_schema() {
