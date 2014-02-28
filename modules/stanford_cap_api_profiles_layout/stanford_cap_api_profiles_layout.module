@@ -5,19 +5,15 @@
  */
 
 define('CAP_FIELDS_IMPORT_LAYOUT', 'import_layout');
-include_once 'stanford_cap_api_profiles_layout.features.inc';
 
 /**
  * Implements hook_cron().
  */
 function stanford_cap_api_profiles_layout_cron() {
-  // Run cron tasks between 1 and 5 hours.
-  $tz = variable_get('date_default_timezone');
-  $date = new DateObject('now', $tz);
-  $hour_of_day = (int) $date->format('G');
-  if ($hour_of_day >= 1 && $hour_of_day <= 5) {
-    stanford_cap_api_profiles_layout_check_layout();
-  }
+  $tasks = array(
+    array('stanford_cap_api_profiles_layout_check_layout'),
+  );
+  stanford_cap_api_run_cron($tasks);
 }
 
 /**
@@ -35,12 +31,10 @@ function stanford_cap_api_profiles_layout_get() {
 /**
  * Returns layout without headings and section, plain array of fields.
  *
- * This array is used for synchronizing only fields listed in layout. Also this
- * array contains "orgCode" fields to keep track to which organization profile
- * belongs to.
+ * This array is used for synchronizing only fields listed in layout.
  */
 function stanford_cap_api_profiles_layout_get_plain() {
-  $plain =& drupal_static(__FUNCTION__, array());
+  static $plain = array();
   if (empty($plain)) {
     $layout = stanford_cap_api_profiles_layout_get();
     foreach ($layout['headings'] as $heading) {
@@ -51,10 +45,6 @@ function stanford_cap_api_profiles_layout_get_plain() {
           }
         }
       }
-    }
-    $orgcode_fields = stanford_cap_api_profiles_get_orgcode_fields();
-    if (!empty($orgcode_fields)) {
-      $plain = array_merge($plain, $orgcode_fields);
     }
   }
 
@@ -210,7 +200,7 @@ function stanford_cap_api_profiles_layout_reset($display_mode = 'full') {
  *
  * Adding submit handler to set batch for layout synchronization.
  */
-function stanford_cap_api_profiles_layout_form_stanford_cap_api_settings_form_alter(&$form) {
+function stanford_cap_api_profiles_layout_form_stanford_cap_api_settings_form_alter(&$form, &$form_state) {
   // Need to  start layout sync process only if it's not synced yet.
   if (!variable_get('stanford_cap_api_profiles_layout_synced', FALSE)) {
     $form['#submit'][50] = 'stanford_cap_api_profiles_layout_settings_form_submit';
