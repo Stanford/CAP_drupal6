@@ -1267,6 +1267,7 @@ function _stanford_cap_api_profiles_synchronize_schema_subfields($f_name, $f_sch
  */
 function _stanford_cap_api_profiles_field_create($field_info) {
   module_load_include('inc', 'content', 'includes/content.crud');
+  drupal_alter('stanford_cap_api_profiles_field_create', $field_info);
   content_field_instance_create($field_info);
 }
 

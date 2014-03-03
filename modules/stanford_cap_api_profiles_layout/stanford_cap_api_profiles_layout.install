@@ -13,6 +13,21 @@ function stanford_cap_api_profiles_layout_install() {
 }
 
 /**
+ * Implements hook_enable().
+ */
+function stanford_cap_api_profiles_layout_enable() {
+  // Hiding all fields to display only those, mentioned in layout.
+  module_load_include('inc', 'content', 'includes/content.crud');
+  $fields = content_fields(NULL, 'cap_stanford_profile');
+  foreach ($fields as $field) {
+    $field['display_settings']['full']['exclude'] = TRUE;
+    content_field_instance_update($field, FALSE);
+  }
+  content_clear_type_cache(TRUE);
+  menu_rebuild();
+}
+
+/**
  * Implements hook_schema().
  */
 function stanford_cap_api_profiles_layout_schema() {
@@ -33,30 +48,9 @@ function stanford_cap_api_profiles_layout_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'entity_type' => array(
-        'description' => 'Entity type this field attached to.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'bundle' => array(
-        'description' => 'Entity bundle this field attached to.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'mode' => array(
-        'description' => 'View mode.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
     ),
     'primary key' => array('id'),
-    'unique key' => array('group_name', 'entity_type', 'bundle'),
+    'unique key' => array('group_name'),
   );
 
   return $schema;

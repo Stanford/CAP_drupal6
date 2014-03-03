@@ -62,8 +62,7 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
   if ($batch) {
     $operations = array();
   }
-  ctools_include('export');
-  $modified = variable_get('stanford_cap_api_profiles_layout_modified');
+  $modified = variable_get('stanford_cap_api_profiles_layout_modified', '');
   $layout = stanford_cap_api_profiles_layout_get();
   // Check if layout changed since last check.
   if (!empty($layout['headings']) && $layout['lastModified'] != $modified) {
@@ -81,44 +80,35 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
     // Each heading will become a fieldgroup.
     foreach ($layout['headings'] as $heading) {
       // Creating filed_group for heading.
-      $entity_type = 'node';
-      $bundle = 'cap_stanford_profile';
-      $group_name = _stanford_cap_api_profiles_get_field_name($heading['name']);
+      $node_type = 'cap_stanford_profile';
+      $group_name = _stanford_cap_api_profiles_layout_generate_group_name($heading['name']);
       $label = $heading['name'];
-      $children = array();
 
-      $field_group = field_group_load_field_group($group_name, $entity_type, $bundle, $mode);
+      $field_group = fieldgroup_get_group($node_type, $group_name);
       if (!$field_group) {
-        $field_group = (object) array(
-          'identifier' => $group_name . '|' . $entity_type . '|' . $bundle . '|' . $mode,
-          'group_name' => $group_name,
-          'entity_type' => $entity_type,
-          'bundle' => $bundle,
-          'mode' => $mode,
-          'children' => $children,
-          'parent_name' => '',
-          'weight' => $weight,
+        $field_group = array(
           'label' => $label,
-          'format_type' => 'fieldset',
-          'format_settings' => array(
-            'formatter' => 'open',
-            'instance_settings' => array(
-              'description' => '',
-            ),
-          ),
-          'disabled' => FALSE,
+          'group_name' => $group_name,
+          'group_type' => 'standard',
+          'type_name' => $node_type,
+          'weight' => $weight,
+          'parent' => '',
         );
-        $classes = _field_group_get_html_classes($field_group);
-        $field_group->format_settings['instance_settings']['classes'] = implode(' ', $classes->optional);
-        // Save and enable it in ctools.
+        $field_group['settings'] = field_group_default_settings($field_group['group_type']);
         if ($batch) {
           $operations[] = array(
-            '_stanford_cap_api_profiles_layout_field_group_save',
-            array($field_group),
+            'fieldgroup_save_group',
+            array($field_group['type_name'], $field_group),
+          );
+          $operations[] = array(
+            'drupal_write_record',
+            array('cap_api_groups', $field_group),
           );
         }
         else {
-          _stanford_cap_api_profiles_layout_field_group_save($field_group);
+          fieldgroup_save_group($field_group['type_name'], $field_group);
+          // Save created field groups so we can remove them on reset.
+          drupal_write_record('cap_api_groups', $field_group);
         }
         $weight++;
       }
@@ -128,7 +118,8 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
         $section_weight = 0;
         foreach ($heading['sections'] as $section) {
           if (!empty($section['displayFields'])) {
-            _stanford_cap_api_profiles_layout_sync_sections_fields($section, $section_weight, $children, $operations);
+            $section['weight'] = empty($section['weight']) ? $section_weight : $section['weight'];
+            _stanford_cap_api_profiles_layout_sync_sections_fields($section, $field_group, $operations);
             // @todo: Leaving this for now.
             // $children[] = _stanford_cap_api_profiles_layout_sync_sections($section, $group_name, $section_weight);
             // $section_weight++;
@@ -137,12 +128,17 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
       }
       if ($batch) {
         $operations[] = array(
-          '_stanford_cap_api_profiles_layout_batch_update_helper',
-          array($group_name, $entity_type, $bundle, $mode, $children),
+          'content_clear_type_cache',
+          array(TRUE),
+        );
+        $operations[] = array(
+          'menu_rebuild',
+          array(),
         );
       }
       else {
-        _stanford_cap_api_profiles_layout_batch_update_helper($group_name, $entity_type, $bundle, $mode, $children);
+        content_clear_type_cache(TRUE);
+        menu_rebuild();
       }
     }
     if ($batch) {
@@ -155,7 +151,7 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
       batch_set($batch);
     }
     else {
-      // Settings form get modified based on value of this variable. In case
+      // Settings form get modified based on value of this variable.
       variable_set('stanford_cap_api_profiles_layout_synced', TRUE);
     }
     // Storing last modification date of profile.
@@ -171,24 +167,20 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
  *   Display mode.
  */
 function stanford_cap_api_profiles_layout_reset($display_mode = 'full') {
-  // Deleting all field groups that we previously created.
-  $field_groups = db_select('cap_api_groups')->fields('cap_api_groups')->execute()->fetchAllAssoc('id', PDO::FETCH_ASSOC);
-  ctools_include('export');
-  foreach ($field_groups as $field_group) {
-    $group = field_group_load_field_group($field_group['group_name'], $field_group['entity_type'], $field_group['bundle'], $field_group['mode']);
-    ctools_export_crud_delete('field_group', $group);
+  // Enable all fields display.
+  module_load_include('inc', 'content', 'includes/content.crud');
+  $fields = content_fields(NULL, 'cap_stanford_profile');
+  foreach ($fields as $field) {
+    $field['display_settings'][$display_mode]['exclude'] = TRUE;
+    content_field_instance_update($field, FALSE);
   }
-  db_delete('cap_api_groups')->execute();
-  // Drops display mode settings for previously created field collections.
-  _stanford_cap_api_profiles_layout_drop_fc_display_settings();
-  // Drop display settings for all fields of profile node.
-  $instances = field_info_instances('node', 'cap_stanford_profile');
-  foreach ($instances as $instance) {
-    if ($instance['field_name'] != 'cap_profile_image') {
-      unset($instance['display'][$display_mode]);
-      field_update_instance($instance);
-    }
+  content_clear_type_cache(TRUE);
+  menu_rebuild();
+  $result = db_query("SELECT group_name FROM {cap_api_groups}");
+  while ($group_name = db_result($result)) {
+    fieldgroup_delete('cap_stanford_profile', $group_name);
   }
+  db_query("DELETE FROM {cap_api_groups}");
   // Removing info about profile layout schema modification time.
   variable_del('stanford_cap_api_profiles_layout_modified');
   // Removing variable indicating that layout was synced.
@@ -326,15 +318,14 @@ function _stanford_cap_api_profiles_layout_sync_sections($section, $heading_name
  *
  * @param array $section
  *   Section configuration.
- * @param int $section_weight
- *   Weight of fields in section.
- * @param array $children
- *   Array of children of parent heading.
+ * @param array $field_group
+ *   Field group.
  * @param array $operations
  *   Array of operations for batch mode.
  */
-function _stanford_cap_api_profiles_layout_sync_sections_fields($section, &$section_weight, &$children, &$operations = NULL) {
+function _stanford_cap_api_profiles_layout_sync_sections_fields($section, $field_group, &$operations = NULL) {
   $mode = 'full';
+  $section_weight = $section['weight'];
   // All fields for current display mode are currently hidden. Lets show those
   // listed in displayFields array.
   foreach ($section['displayFields'] as $field_path) {
@@ -343,27 +334,29 @@ function _stanford_cap_api_profiles_layout_sync_sections_fields($section, &$sect
       $field_info = _stanford_cap_api_profiles_get_field_info_by_path($field_path);
       // Check if this field exist.
       if (!empty($field_info)) {
-        // Adding this field collection to children of field group.
-        $children[] = $field_info['field_name'];
-        $field_instance = field_info_instance($field_info['entity_type'], $field_info['field_name'], $field_info['bundle']);
-        // Make sure field instance exists.
-        if ($field_instance) {
-          // Setting default field instance display settings
-          // for current display mode.
-          _stanford_cap_api_profiles_layout_set_instance_display_settings($field_instance, $mode);
-          // Setting weight for viewing.
-          $field_instance['display'][$mode]['weight'] = $section_weight;
-          // Setting weight for edit form.
-          $field_instance['widget']['weight'] = $section_weight;
-          if (isset($operations)) {
-            $operations[] = array(
-              'field_update_instance',
-              array($field_instance),
-            );
-          }
-          else {
-            field_update_instance($field_instance);
-          }
+        // Adding field to field group.
+        $values = array(
+          'type_name' => $field_group['type_name'],
+          'field_name' => $field_info['field_name'],
+          'group' => $field_group['group_name'],
+        );
+        $field = content_fields($field_info['field_name'], $field_info['bundle']);
+        $field['widget']['weight'] = $section_weight;
+        $field['display_settings'][$mode]['exclude'] = FALSE;
+        if (isset($operations)) {
+          // Batch mode.
+          $operations[] = array(
+            '_stanford_cap_api_profiles_layout_update_field',
+            array($field),
+          );
+          $operations[] = array(
+            'fieldgroup_update_fields',
+            array($values),
+          );
+        }
+        else {
+          _stanford_cap_api_profiles_layout_update_field($field);
+          fieldgroup_update_fields($values);
         }
       }
     }
@@ -375,27 +368,39 @@ function _stanford_cap_api_profiles_layout_sync_sections_fields($section, &$sect
       for ($i = 0; $i < $levels; $i++) {
         $field_info = _stanford_cap_api_profiles_get_field_info_by_path(implode('.', $parts));
         if (!empty($field_info)) {
-          $field_instance = field_info_instance($field_info['entity_type'], $field_info['field_name'], $field_info['bundle']);
-          if ($field_instance) {
-            _stanford_cap_api_profiles_layout_set_instance_display_settings($field_instance, $mode);
-            $field_instance['display'][$mode]['weight'] = $section_weight;
-            $field_instance['widget']['weight'] = $section_weight;
-            if (isset($operations)) {
-              $operations[] = array(
-                'field_update_instance',
-                array($field_instance),
-              );
-            }
-            else {
-              field_update_instance($field_instance);
-            }
+          $field = content_fields($field_info['field_name'], $field_info['bundle']);
+          $field['widget']['weight'] = $section_weight;
+          $field['display_settings'][$mode]['exclude'] = FALSE;
+          if (isset($operations)) {
+            // Batch mode.
+            $operations[] = array(
+              '_stanford_cap_api_profiles_layout_update_field',
+              array($field),
+            );
+          }
+          else {
+            _stanford_cap_api_profiles_layout_update_field($field);
           }
         }
         array_pop($parts);
       }
-      if ($field_info) {
+      if ($field) {
         // Only top level field go to field group children.
-        $children[] = $field_info['field_name'];
+        $values = array(
+          'type_name' => $field_group['type_name'],
+          'field_name' => $field['field_name'],
+          'group' => $field_group['group_name'],
+        );
+        if (isset($operations)) {
+          // Batch mode.
+          $operations[] = array(
+            'fieldgroup_update_fields',
+            array($values),
+          );
+        }
+        else {
+          fieldgroup_update_fields($values);
+        }
       }
     }
     $section_weight++;
@@ -403,88 +408,14 @@ function _stanford_cap_api_profiles_layout_sync_sections_fields($section, &$sect
 }
 
 /**
- * Set default field instance display settings for specific display mode.
+ * Updates field settings.
  *
- * @param array $field_instance
- *   Field instance.
- * @param string $mode
- *   Display mode.
+ * @param array $field
+ *   Field definition.
  */
-function _stanford_cap_api_profiles_layout_set_instance_display_settings(&$field_instance, $mode) {
-  $field_instance['display'][$mode] = array();
-  // Creating settings array fot display mode.
-  $display =& $field_instance['display'][$mode];
-  $field = field_info_field($field_instance['field_name']);
-  $field_type = field_info_field_types($field['type']);
-  $display['type'] = isset($field_type['default_formatter']) ? $field_type['default_formatter'] : 'hidden';
-  if ($display['type'] != 'hidden') {
-    $formatter_type = field_info_formatter_types($display['type']);
-    $display['module'] = $formatter_type['module'];
-    $display['settings'] = field_info_formatter_settings($display['type']);
-    if ($field['type'] == 'field_collection') {
-      $variable = array(
-        'view_modes' => array(
-          'full' => array(
-            'custom_settings' => TRUE,
-          ),
-        ),
-      );
-      $variable_name = 'field_bundle_settings_field_collection_item__' . $field_instance['field_name'];
-      variable_set($variable_name, $variable);
-      // Empty settings used to hid this links.
-      $display['settings']['add'] = '';
-      $display['settings']['edit'] = '';
-      $display['settings']['delete'] = '';
-    }
-  }
-}
-
-/**
- * Drops display mode settings for field collections.
- */
-function _stanford_cap_api_profiles_layout_drop_fc_display_settings() {
-  $fields = db_select('cap_api_fields', 'f')->fields('f', array('field_name'))->execute()->fetchCol();
-  foreach ($fields as $field) {
-    variable_del('field_bundle_settings_field_collection_item__' . $field);
-  }
-}
-
-/**
- * Helper to save field group.
- *
- * @param object $field_group
- *   Field group object.
- */
-function _stanford_cap_api_profiles_layout_field_group_save($field_group) {
-  ctools_include('export');
-  ctools_export_crud_save('field_group', $field_group);
-  ctools_export_crud_enable('field_group', $field_group->identifier);
-  // Save created field groups so we can remove them on reset.
-  drupal_write_record('cap_api_groups', $field_group);
-}
-
-/**
- * Helper to update field group children.
- *
- * @param string $group_name
- *   Group name.
- * @param string $entity_type
- *   Entity type.
- * @param string $bundle
- *   Entity bundle.
- * @param string $mode
- *   Display mode.
- * @param array $children
- *   Array of field names used to be show as children of this field group.
- */
-function _stanford_cap_api_profiles_layout_batch_update_helper($group_name, $entity_type, $bundle, $mode, $children) {
-  ctools_include('export');
-  // Function field_group_group_save() doesn't update original object on
-  // save, so need to reload object to get it ID and avoid:
-  // Integrity constraint violation: Duplicate entry for key 'identifier'.
-  $field_group = field_group_load_field_group($group_name, $entity_type, $bundle, $mode);
-  $field_group->children = $children;
-  ctools_export_crud_save('field_group', $field_group);
+function _stanford_cap_api_profiles_layout_update_field($field) {
+  module_load_include('inc', 'content', 'includes/content.crud');
+  content_field_instance_update($field, FALSE);
 }
 
 /**
@@ -492,4 +423,24 @@ function _stanford_cap_api_profiles_layout_batch_update_helper($group_name, $ent
  */
 function _stanford_cap_api_profiles_layout_batch_finished() {
   variable_set('stanford_cap_api_profiles_layout_synced', TRUE);
+}
+
+/**
+ * Generate Drupal compliant field group name.
+ *
+ * @param string $name
+ *   Human readable group name.
+ *
+ * @return string
+ *   Drupal compliant field group name.
+ */
+function _stanford_cap_api_profiles_layout_generate_group_name($name) {
+  return drupal_substr('group_' . str_replace(' ', '_', drupal_strtolower($name)), 0, 32);
+}
+
+function stanford_cap_api_profiles_layout_stanford_cap_api_profiles_field_create_alter(&$field) {
+  $mode = 'full';
+  if ($field['type_name'] == 'cap_stanford_profile') {
+    $field['display_settings'][$mode]['exclude'] = TRUE;
+  }
 }
