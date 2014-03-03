@@ -57,7 +57,11 @@ projects[features][download][revision] = 0e7bc91fd23cec19d00e04b9a75f1c89ffe8b59
 ; Strongarm
 projects[strongarm][type] = "module"
 projects[strongarm][subdir] = "contrib"
-projects[strongarm][version] = 6.x-2.2
+projects[strongarm][version] = 2.2
+; Ctools
+projects[ctools][type] = "module"
+projects[ctools][subdir] = "contrib"
+projects[ctools][version] = 1.11
 ; Date
 projects[date][type] = "module"
 projects[date][subdir] = "contrib"
@@ -70,6 +74,18 @@ projects[link][subdir] = "contrib"
 projects[link][download][type] = git
 projects[link][download][branch] = 6.x-2.x
 projects[link][download][revision] = 50bd3d7a4201e7f6da6a646214367a225caa5fd4
+; Views
+projects[views][type] = "module"
+projects[views][subdir] = "contrib"
+projects[views][download][type] = git
+projects[views][download][branch] = 6.x-3.x
+projects[views][download][revision] = eba344a6b9fc149bdf1b72914b8b8c6cfd6c1f54
+; Views Bulk Operations
+projects[views_bulk_operations][type] = "module"
+projects[views_bulk_operations][subdir] = "contrib"
+projects[views_bulk_operations][download][type] = git
+projects[views_bulk_operations][download][branch] = 6.x-1.x
+projects[views_bulk_operations][download][revision] = 12bb5a7ff7256bbc122f6b016af5fcb92e829c33
 
 ; Stanford CAP API
 projects[stanford_cap_api][type] = "module"
