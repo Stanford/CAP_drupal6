@@ -101,14 +101,14 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
             array($field_group['type_name'], $field_group),
           );
           $operations[] = array(
-            'drupal_write_record',
-            array('cap_api_groups', $field_group),
+            '_stanford_cap_api_profiles_layout_write_record_wrapper',
+            array($field_group),
           );
         }
         else {
           fieldgroup_save_group($field_group['type_name'], $field_group);
           // Save created field groups so we can remove them on reset.
-          drupal_write_record('cap_api_groups', $field_group);
+          _stanford_cap_api_profiles_layout_write_record_wrapper($field_group);
         }
         $weight++;
       }
@@ -158,6 +158,16 @@ function stanford_cap_api_profiles_layout_check_layout($batch = FALSE) {
     variable_set('stanford_cap_api_profiles_layout_modified', $layout['lastModified']);
   }
 
+}
+
+/**
+ * Wrapper around drupal_write_record() for batch operations.
+ *
+ * Must use wrapper because in PHP 5.2 batch context get merged
+ * to drupal_write_record() params leading to fatal error.
+ */
+function _stanford_cap_api_profiles_layout_write_record_wrapper($field_group) {
+  drupal_write_record('cap_api_groups', $field_group);
 }
 
 /**
