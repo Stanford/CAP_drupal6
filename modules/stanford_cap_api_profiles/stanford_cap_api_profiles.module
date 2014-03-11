@@ -533,7 +533,7 @@ function stanford_cap_api_profiles_sync_org_members($org_code, &$operations = NU
       }
     }
     else {
-      watchdog('stanford_cap_api_profiles', 'There was issue in retrieving data from CAP service for "@org_code" organization.', array('@org_code' => $org_code));
+      watchdog('stanford_cap_api_profiles', 'There was an issue while retrieving data from CAP service for "@org_code" organization.', array('@org_code' => $org_code));
     }
   }
 
@@ -575,7 +575,7 @@ function stanford_cap_api_profiles_sync_workgroup_members($workgroup_id, &$opera
       }
     }
     else {
-      watchdog('stanford_cap_api_profiles', 'There was issue in retrieving data from CAP service for "@workgroup" workgroup.', array('@workgroup' => $workgroup_id));
+      watchdog('stanford_cap_api_profiles', 'There was an issue while retrieving data from CAP service for "@workgroup" workgroup.', array('@workgroup' => $workgroup_id));
     }
   }
 
