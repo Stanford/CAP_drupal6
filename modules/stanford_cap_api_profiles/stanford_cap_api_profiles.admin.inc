@@ -788,7 +788,7 @@ function stanford_cap_api_profiles_user_autocomplete($str = '') {
  */
 function stanford_cap_api_profiles_taxonomy_autocomplete($tag_typed = '') {
   $matches = array();
-  $result = db_query("SELECT nid, title FROM {node} WHERE type = 'stanford_organization' AND title LIKE '%%%s%%'", $tag_typed);
+  $result = db_query("SELECT nid, title FROM {node} WHERE type = 'stanford_organization' AND LOWER(title) LIKE '%%%s%%'", drupal_strtolower($tag_typed));
   if ($result) {
     while ($node = db_fetch_array($result)) {
       if (!empty($node['nid']) && !empty($node['title'])) {
