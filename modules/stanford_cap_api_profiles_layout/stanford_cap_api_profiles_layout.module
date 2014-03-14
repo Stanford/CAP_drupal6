@@ -210,6 +210,7 @@ function stanford_cap_api_profiles_layout_form_stanford_cap_api_settings_form_al
   }
   // Extending list of fields to synchronize.
   if (!variable_get('stanford_cap_api_profiles_schema_synchronized', FALSE)) {
+    $form['synchronization']['stanford_cap_api_import_profile_fields']['#default_value'] = CAP_FIELDS_IMPORT_LAYOUT;
     $form['synchronization']['stanford_cap_api_import_profile_fields']['#options'][CAP_FIELDS_IMPORT_LAYOUT] = t('Import suggested display fields only. Includes minimal set of fields which have a display layout in CAP.');
   }
 }
