@@ -214,6 +214,7 @@ function stanford_cap_api_profiles_settings_form_submit($form, &$form_state) {
  * Form builder for import page.
  */
 function stanford_cap_api_profiles_import_form($form_state) {
+  drupal_set_title(t('Profile import'));
   $form = array();
   $form['description'] = array(
     '#type' => 'item',
@@ -510,6 +511,7 @@ function _stanford_cap_api_profiles_reset_batch($field_name) {
  * Groups synchronization from builder.
  */
 function stanford_cap_api_profiles_group_sync_form($form_state) {
+  drupal_set_title(t('Group import'));
   $form = array();
   $form['description'] = array(
     '#value' => t('CAP profiles associated with specific groups can be automatically synced with this site on an ongoing basis. Use the tools on this page to manage the groups that are synced with the site.'),
