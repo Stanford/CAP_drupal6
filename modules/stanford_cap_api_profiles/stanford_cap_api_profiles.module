@@ -101,6 +101,7 @@ function stanford_cap_api_profiles_perm() {
  * Implements hook_menu_alter().
  */
 function stanford_cap_api_profiles_menu_alter(&$items) {
+  // Disables access to node edit page for profile nodes, if set in settings.
   $items['node/%node/edit']['access callback'] = 'stanford_cap_api_profiles_node_access';
   $content_type = content_types('cap_stanford_profile');
   // If content type is not defined yet returned value will be array
@@ -110,6 +111,11 @@ function stanford_cap_api_profiles_menu_alter(&$items) {
     foreach ((array) $content_type['fields'] as $field) {
       $items['admin/content/node-type/' . $content_type['url_str'] . '/fields/' . $field['field_name']]['access callback'] = 'stanford_cap_api_profiles_user_access';
     }
+  }
+  // Forbid to create new nodes of types which used in profiles flexifields.
+  foreach (node_get_types('types', NULL, TRUE) as $type) {
+    $type_url_str = str_replace('_', '-', $type->type);
+    $items['node/add/' . $type_url_str]['access callback'] = 'stanford_cap_api_profiles_flexifield_access';
   }
 }
 
@@ -122,6 +128,23 @@ function stanford_cap_api_profiles_node_access($op, $node) {
   $access = node_access($op, $node);
   if ($access && $node->type == 'cap_stanford_profile') {
     if (!variable_get('stanford_cap_api_profile_allow_edit', FALSE)) {
+      $access = FALSE;
+    }
+  }
+
+  return $access;
+}
+
+/**
+ * Access override for content types.
+ *
+ * Hide all content types created by this module
+ * if "Allow user to create custom fields?" setting is empty.
+ */
+function stanford_cap_api_profiles_flexifield_access($op, $node_type) {
+  $access = node_access($op, $node_type);
+  if ($access && in_array($node_type, _stanford_cap_api_profiles_get_flexifields())) {
+    if (!variable_get('stanford_cap_api_profile_custom_fields', FALSE)) {
       $access = FALSE;
     }
   }
@@ -2109,16 +2132,37 @@ function stanford_cap_api_profiles_get_format() {
   return $format;
 }
 
-function test() {
-
-  $count = 16;
-
-  if ($count > CAP_PROFILES_PER_REQUEST) {
-    $requests_count = (int) ceil($count / CAP_PROFILES_PER_REQUEST);
-
+/**
+ * Implements hook_content_types_overview_alter().
+ *
+ * Hide all content types created by this module
+ * if "Allow user to create custom fields?" setting is empty.
+ */
+function stanford_cap_api_profiles_content_types_overview_alter(&$header, &$rows) {
+  if (!variable_get('stanford_cap_api_profile_custom_fields', FALSE)) {
+    $flexifields_list = _stanford_cap_api_profiles_get_flexifields();
+    foreach ($rows as $key => $row) {
+      if (in_array($row[1], $flexifields_list)) {
+        unset($rows[$key]);
+      }
+    }
   }
-  else {
-    $requests_count = 1;
+}
+
+/**
+ * Returns list of all created flexifields.
+ *
+ * @return array
+ *   List of all created flexifields.
+ */
+function _stanford_cap_api_profiles_get_flexifields() {
+  static $list = array();
+  if (empty($list)) {
+    $result = db_query("SELECT field_name FROM {cap_api_fields_map} WHERE entity_type = 'flexifield' ");
+    while ($field_name = db_result($result)) {
+      $list[] = $field_name;
+    }
   }
-  dpm($requests_count);
+
+  return $list;
 }
