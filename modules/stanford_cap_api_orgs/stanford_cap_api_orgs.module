@@ -1,0 +1,206 @@
+<?php
+
+/**
+ * @file
+ * Main code for Stanford CAP API OrgCodes.
+ */
+
+include_once 'stanford_cap_api_orgs.features.inc';
+
+/**
+ * Get information about organizations hierarchy from CAP API.
+ *
+ * Organizations have tree structure. To import them we must specify top level
+ * organization code. This can be code of root entry - Stanford University(AA00)
+ * itself, or code of one of departments, like School of Medicine(VAAA).
+ *
+ * @param string $top
+ *   Top level organization code.
+ *
+ * @return array
+ *   Organizations hierarchy.
+ */
+function stanford_cap_api_orgs_get($top = 'AA00') {
+  // Organizations endpoint.
+  $endpoint = '/cap/v1/orgs';
+  $params = array('orgCodes' => $top);
+
+  return stanford_cap_api_request($endpoint, $params);
+}
+
+/**
+ * Save organization fetched from CAP API.
+ *
+ * @param array $organization
+ *   Array containing organization description.
+ * @param int $parent_data
+ *   Parent term ID.
+ */
+function stanford_cap_api_orgs_save_organization($organization, $parent_data = NULL, &$operations = NULL) {
+  $vid = variable_get('stanford_cap_api_orgs_vid', 0);
+  // Check if organization node already exists, drop if so.
+  $result = db_query("SELECT nid FROM {node} n WHERE title = '%s'", $organization['name']);
+  if ($result) {
+    $result = db_fetch_array($result);
+    if (!empty($result['nid'])) {
+      $node = node_load($result['nid']);
+    }
+  }
+  if (!isset($node)) {
+    $node = new stdClass();
+  }
+  $node->uid = 0;
+  $node->type = 'stanford_organization';
+  $node->title = $organization['name'];
+  $node->field_alias[] = array('value' => $organization['alias']);
+  $node->field_browsable[] = array('value' => $organization['browsable']);
+  $node->field_type[] = array('value' => $organization['type']);
+  $node->field_url[] = array('url' => empty($organization['url']) ? '' : $organization['url']);
+  $taxonomy = array();
+  foreach ($organization['orgCodes'] as $org_code) {
+    $terms = taxonomy_get_term_by_name($org_code);
+    if (empty($terms)) {
+      // Term should be created.
+      $term = array(
+        'vid' => $vid,
+        'name' => $org_code,
+        'description' => $organization['name'],
+      );
+      if (isset($organization['weight'])) {
+        $term['weight'] = $organization['weight'];
+      }
+      if (isset($parent_data)) {
+        $term['parent'][$parent_data] = $parent_data;
+      }
+      taxonomy_save_term($term);
+      $tid = $term['tid'];
+    }
+    else {
+      $term = array_shift($terms);
+      $tid = $term->tid;
+    }
+    $taxonomy[$vid][$tid] = $tid;
+  }
+  $node->taxonomy = $taxonomy;
+  // Batch mode?
+  if (isset($operations)) {
+    $operations[] = array('_stanford_cap_api_orgs_import_batch_save', array($node));
+  }
+  else {
+    node_save($node);
+  }
+  if (isset($organization['children'])) {
+    foreach ($organization['children'] as $key => $child) {
+      $child['weight'] = $key;
+      stanford_cap_api_orgs_save_organization($child, $tid, $operations);
+    }
+  }
+}
+
+/**
+ * Imports organizations from CAP API.
+ */
+function stanford_cap_api_orgs_import($batch = FALSE) {
+  $organizations = stanford_cap_api_orgs_get();
+
+  if ($organizations) {
+    if ($batch) {
+      $operations = array();
+      variable_set('stanford_cap_api_orgs_import_started', REQUEST_TIME);
+    }
+    foreach ($organizations as $organization) {
+      stanford_cap_api_orgs_save_organization($organization, NULL, $operations);
+    }
+    if ($batch) {
+      $batch = array(
+        'title' => t('Importing CAP data'),
+        'operations' => $operations,
+        'finished' => '_stanford_cap_api_orgs_batch_finished',
+        'progress_message' => t('Importing organizations: @current of @total.'),
+      );
+      batch_set($batch);
+    }
+    else {
+      if (!variable_get('stanford_cap_api_orgs_imported', FALSE)) {
+        variable_set('stanford_cap_api_orgs_imported', TRUE);
+        menu_rebuild();
+      }
+    }
+  }
+}
+
+
+/**
+ * Implements hook_cron().
+ */
+function stanford_cap_api_orgs_cron() {
+  stanford_cap_api_run_cron(array(array('stanford_cap_api_orgs_import')));
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Attaching additional submit handler to settings form in order to import
+ * organizations on initial setup.
+ */
+function stanford_cap_api_orgs_form_stanford_cap_api_settings_form_alter(&$form, &$form_state) {
+  if (!variable_get('stanford_cap_api_orgs_imported', FALSE)) {
+    $form['#submit'][99] = 'stanford_cap_api_orgs_stanford_cap_api_settings_form_submit';
+    ksort($form['#submit']);
+  }
+}
+
+/**
+ * Submit handler callback.
+ */
+function stanford_cap_api_orgs_stanford_cap_api_settings_form_submit($form, $form_state) {
+  if (isset($form_state['values']['stanford_cap_api_import_profile_fields']) && $form_state['values']['stanford_cap_api_import_profile_fields'] == CAP_FIELDS_IMPORT_LIST) {
+    $form_state['rebuild'] = TRUE;
+  }
+  else {
+    stanford_cap_api_orgs_import(TRUE);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Adding info about organizations.
+ */
+function stanford_cap_api_orgs_form_stanford_cap_api_details_form_alter(&$form, &$form_state) {
+  // Count organization nodes.
+  $result = db_query("SELECT COUNT(nid) AS orgs FROM {node} n WHERE type = 'stanford_organization'");
+  $orgs_count = 0;
+  if ($result) {
+    $result = db_fetch_array($result);
+    if (!empty($result['orgs'])) {
+      $orgs_count = $result['orgs'];
+    }
+  }
+  $form['organizations'] = array(
+    '#value' => theme('cap_info_item', $orgs_count, t('Organizations imported.')),
+  );
+}
+
+/**
+ * Finished callback for organizations import.
+ */
+function _stanford_cap_api_orgs_batch_finished() {
+  variable_set('stanford_cap_api_orgs_imported', TRUE);
+  drupal_set_message(t('Organizations import took %time seconds.', array('%time' => REQUEST_TIME - variable_get('stanford_cap_api_orgs_import_started', 0))));
+  variable_del('stanford_cap_api_orgs_import_started');
+  menu_rebuild();
+}
+
+/**
+ * Helper for batch organizations import.
+ *
+ * Saves the node. We can't put node_save() to batch operations directly
+ * because it expects param passed by reference.
+ *
+ * @param object $node
+ *   Node.
+ */
+function _stanford_cap_api_orgs_import_batch_save($node) {
+  node_save($node);
+}
